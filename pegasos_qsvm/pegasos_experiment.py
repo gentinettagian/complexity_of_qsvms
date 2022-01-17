@@ -100,7 +100,9 @@ def get_data_generated(qnn, M=100, margin=0.1, bias=0, shuffle=True, seed=41, re
 # Adapt above method for QSVM (trivial QNN)
 def generate_qsvm_data(feature_map,margin,M,M_test=None,seed=41):
     q = feature_map.q
+    # Trivial variational form
     varform = _VariationalForm(q,1,None)
+    # This qnn is equivalent to the QSVM
     qnn = QuantumNeuralNetwork(feature_map=feature_map,variational_form=varform)
     qnn.fit_theta(np.array([0]))
     X,y,_ = get_data_generated(qnn,M=M+M_test,margin=margin,seed=seed)
@@ -115,7 +117,15 @@ def accuracy(y1,y2):
     return (1. - np.sum(np.abs(y1 - y2),axis=-1)/(2.*len(y1)))
 
 def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
-
+    """Runs experiments for the Pegasos algorithms and saves results to a csv file.
+    margin.. Margin between the data classes. Positive for separable, negative for overlapping
+    C.. Regulizer (1/lambda in the paper)
+    N.. Number of iterations
+    shots.. List of different number of shots 'R' to test
+    M.. training data size
+    M_test.. test data size
+    n_tests.. number of tests
+    """
     # Feature map for the experiment
     feature_map = MediumFeatureMap(2,4)
 
@@ -124,27 +134,27 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     
     # Checking whether experiment has already been partially done and loading existing data
     try:
-        results = pd.read_csv(f'experiments/shots_margin{margin}_data.csv')
+        results = pd.read_csv(f'data/margin{margin}_data.csv')
     except:
         columns = ['seed','R','C','M']
         columns += [f'train acc. it. {n}' for n in range(N)]
         columns += [f'test acc. it. {n}' for n in range(N)]
         columns += [f'a error it. {n}' for n in range(N)]
         results = pd.DataFrame(columns=columns)
-        results.to_csv(f'experiments/shots_margin{margin}_data.csv',index=False)
+        results.to_csv(f'data/margin{margin}_data.csv',index=False)
 
+    # Fix random seed to make reproducable
     np.random.seed(41)
 
-    # Change to qasm-simulator if noise is modelled via shots
-    adhoc_backend = QuantumInstance(BasicAer.get_backend('statevector_simulator'))
+    # Statevector backend as referecne to calcualte epsilon
+    sv_backend = QuantumInstance(BasicAer.get_backend('statevector_simulator'))
+    sv_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=sv_backend)
 
-    adhoc_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=adhoc_backend)
+    # Kernel evaluation using statevector
+    K = sv_kernel.evaluate(x_vec=X)
+    K_test = sv_kernel.evaluate(x_vec=Xt,y_vec=X)
 
-    # Kernel evaluation
-    K = adhoc_kernel.evaluate(x_vec=X)
-    K_test = adhoc_kernel.evaluate(x_vec=Xt,y_vec=X)
-
-    # Generating Kernels for different number of shots
+    # Generating Kernels for different number of shots using QASM simulator
     K_shots = np.zeros((len(shots),) + K.shape)
     print('Approximating Kernels')
     for i, R in tqdm(enumerate(shots)):
@@ -156,46 +166,55 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
-
     
     for s in tqdm(seeds):
         algorithm_globals.random_seed = s
-
-
-        # Running tests
-        y_preds, a, _ = pegasos(K,y,N,C,seed=s,full_returns=True)
-        
+        # Run pegasos with statevector as reference
+        _, a, _ = pegasos(K,y,N,C,seed=s,full_returns=True)
 
         for i, R in enumerate(shots):
             # Check whether this has already been calculated
             if ((results['seed'] == s) & (results['R'] == s) & (results['C'] == C)).any():
                 continue
 
-            y2,a2,_ = pegasos(K_shots[i],y,N,C,mu=0,seed=s,full_returns=True)
+            # Run pegasos with finite shots 'R'
+            y2,a2,_,_ = pegasos(K_shots[i],y,N,C,mu=0,seed=s,full_returns=True)
+            # Calculating the errors on the weights
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
+            # Calculating accuracy on test and training set
             accuracies = accuracy(y2,y)
             accuracies_test = np.zeros_like(accuracies)
             for n in range(N):
                 y_n = np.sign((a2[n,:] * y) @ K_test.T)
                 accuracies_test[n] = accuracy(y_n,yt)
 
+            # Saving results to csv
             results.loc[results.shape[0]] = [s, R, C, M] + accuracies.tolist() + accuracies_test.tolist() + errors_a.tolist()
             results.to_csv(f'experiments/shots_margin{margin}_data.csv',index=False)
 
-def create_plots(filename,N,zoom=False):
+def create_plots(filename,N):
+    """
+    Loads the data from 'filename' and creates plots for training and test accuracy, as well as 
+    plots showing the evolution of the error on the weights alpha
+    """
+    # Load data
     data = pd.read_csv(filename)
+    # Get list of the number of shots used
     shots = list(set(data['R']))
     shots.sort()
+    # Get list of the regulizers used
     Cs = list(set(data['C']))
     cols = [blue,orange,green,violet]
+    # x-axis showing the number of iterations
     x = np.arange(N)
+    # Figure for training accuracy plots
     fig_acc, axs_acc = plt.subplots(len(Cs),sharex=True,figsize=[12,12])
+    # Figure for test accuracy plots
     fig_tacc, axs_tacc = plt.subplots(len(Cs),sharex=True,figsize=[12,12])
+    # Figure for error evolution plots
     fig_a, axs_a = plt.subplots(len(Cs),sharex=True,figsize=[12,12])
 
     for j, C in enumerate(Cs):
-        zoomvs =[1,0]
-        tzoomvs = [1,0]
         for i, R in enumerate(shots):
             acc = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4:4 + N])
             if acc.shape[0] is not 0:
@@ -204,10 +223,6 @@ def create_plots(filename,N,zoom=False):
                 acc_upper = np.quantile(acc, upper_percentile, axis=0)
                 axs_acc[j].plot(x, acc_mean[:N], label=f'$R={int(R)}$')
                 axs_acc[j].fill_between(x, acc_lower[:N], acc_upper[:N], alpha=0.3, edgecolor=None)
-                if np.min(acc_lower[50:]) < zoomvs[0]:
-                    zoomvs[0] = np.min(acc_lower[50:])
-                if np.max(acc_upper[50:]) > zoomvs[1]:
-                    zoomvs[1] = np.max(acc_upper[50:])
 
             tacc = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + N:4 + 2*N])
             if tacc.shape[0] is not 0:
@@ -216,10 +231,6 @@ def create_plots(filename,N,zoom=False):
                 tacc_upper = np.quantile(tacc, upper_percentile, axis=0)
                 axs_tacc[j].plot(x, tacc_mean[:N], label=f'$R={int(R)}$')
                 axs_tacc[j].fill_between(x, tacc_lower[:N], tacc_upper[:N], alpha=0.3, edgecolor=None)
-                if np.min(tacc_lower[50:]) < tzoomvs[0]:
-                    tzoomvs[0] = np.min(tacc_lower[50:])
-                if np.max(tacc_upper[50:]) > tzoomvs[1]:
-                    tzoomvs[1] = np.max(tacc_upper[50:])
 
             a = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + 2*N:])
             if a.shape[0] is not 0:
@@ -230,22 +241,15 @@ def create_plots(filename,N,zoom=False):
                 axs_a[j].fill_between(x, (a_lower/C)[:N], (a_upper/C)[:N], alpha=0.3, edgecolor=None)
 
         axs_acc[j].grid()
-        
-        if zoom:
-            axs_acc[j].set(ylim=zoomvs)
-            axs_tacc[j].set(ylim=tzoomvs)
-
         axs_tacc[j].grid()
-        
-    
         axs_a[j].grid()
         
-
-        if j < len(Cs) - 1:
+        # Hard coded labels for the paper
+        if C == 1000:
             axs_acc[j].set(ylabel=fr'Training accuracy, $\lambda = {1/C}$')
             axs_tacc[j].set(ylabel=fr'Test accuracy, $\lambda = {1/C}$')
             axs_a[j].set(ylabel=r'$\lambda\, ||\mathbf{\alpha}_R - \mathbf{\alpha}||,\quad \lambda = 0.001$')
-        else:
+        elif C == 10:
             axs_acc[j].set(ylabel=fr'Training accuracy, $\lambda = {1/C}$',xlabel='Iterations')
             axs_tacc[j].set(ylabel=fr'Test accuracy, $\lambda = {1/C}$',xlabel='Iterations')
             axs_a[j].set(ylabel=r'$\lambda\, ||\mathbf{\alpha}_R - \mathbf{\alpha}||,\quad \lambda = 0.1$',xlabel='Iterations')
@@ -254,8 +258,8 @@ def create_plots(filename,N,zoom=False):
         axs_tacc[1].legend(loc='lower right')
         axs_acc[1].legend(loc='lower right')
         
-    fig_acc.savefig(filename[:-8] + f'acc_plot{"zoom" if zoom else ""}{N}.png',dpi=300,bbox_inches='tight')
-    fig_tacc.savefig(filename[:-8] + f'tacc_plot{"zoom" if zoom else ""}{N}.png',dpi=300,bbox_inches='tight')
+    fig_acc.savefig(filename[:-8] + f'acc_plot{N}.png',dpi=300,bbox_inches='tight')
+    fig_tacc.savefig(filename[:-8] + f'tacc_plot{N}.png',dpi=300,bbox_inches='tight')
     fig_a.savefig(filename[:-8] + f'a_plot{N}.png',dpi=300,bbox_inches='tight')
         
 
