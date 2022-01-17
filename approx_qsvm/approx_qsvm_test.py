@@ -2,24 +2,14 @@
 # Necessary imports
 
 import numpy as np
-import matplotlib.pyplot as plt
-from qiskit.algorithms import optimizers
-
-
-#from torch import Tensor
-#from torch.nn import Linear, CrossEntropyLoss, MSELoss
-#from torch.optim import LBFGS, SGD, Adam
+import pandas as pd
+import pickle
 
 from qiskit  import Aer
 from qiskit.utils import QuantumInstance
-from qiskit.circuit.library import RealAmplitudes, ZZFeatureMap
-from qiskit_machine_learning.neural_networks import CircuitQNN, TwoLayerQNN
-from qiskit_machine_learning.connectors import TorchConnector
-from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier, VQC
-from qiskit.algorithms.optimizers import SPSA, GradientDescent, COBYLA
+from qiskit_machine_learning.algorithms.classifiers import VQC
+from qiskit.algorithms.optimizers import SPSA, GradientDescent
 
-import pandas as pd
-import pickle
 class ApproxQSVMTest():
     """
     Running QSVM Tests
@@ -29,21 +19,30 @@ class ApproxQSVMTest():
         q: number of qubits
         r: feature map repetitions
         d: variational form number of parameters
+        Rshots: number of shots in QASM simulator
+        num_steps: number of SPSA iteration steps
+        control_steps: number of steps in the Gradient Descent statevector optimization
+        seed: random seed used to sample shots and generate data
+        reps: repetitions of the variational form
+        initial_weights: initial weights for the trainable parameters
         """
         
-
+        # QASM-simulator used for the SPSA optimization
         self._backend = QuantumInstance(Aer.get_backend('qasm_simulator'),shots=Rshots)
         self.d = d
-    
         self.seed = seed
         self._reps = reps
+        
+        # Seed for initial weights should be different from the generated data
         np.random.seed(2*seed)
         if initial_weights is None:
             initial_weights = 0.1*(2*np.random.rand(self.d*(reps + 1)) - 1)
-
         self._weight = initial_weights
+
+        # variational quantum circuit used to perform optimization
         self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight)
 
+        # Statevector backend and model
         self._sv_instance = Aer.get_backend('statevector_simulator')
         self._model_sv = VQC(self.d,reps=self._reps,quantum_instance=self._sv_instance,initial_point=self._weight)
 
@@ -57,6 +56,7 @@ class ApproxQSVMTest():
         self._control_steps = control_steps
         self._num_evals = 0
 
+        # Dictionary containing data accumulated during training
         self.history = {'accuracy' : [],
                         'loss' : [],
                         'accuracy_control' : [],
@@ -93,31 +93,38 @@ class ApproxQSVMTest():
         return X,y,theta
     
     def fit_model(self):
-
+        """
+        Perform SPSA optimization using QASM simulator
+        """
         if self._x_train is None:
             RuntimeError('Data not generated')
-        
-        
+         
         self._model.fit(self._x_train,self._y_train)
         
         h_fit = self._model.neural_network.forward(self._x_train,self._weight)
-
-        
+ 
         return h_fit
     
     def fit_statevector(self):
+        """
+        Perform gradient descent optimization using statevector simulator
+        """
         if self._x_train is None:
             RuntimeError('Data not generated')
 
-        
         self._model_sv.fit(self._x_train,self._y_train)
-        
+
         h_sv = self._model_sv.neural_network.forward(self._x_train,self._weight)
-        
+
         return h_sv
     
     def run_experiment(self, M = 100, M_test = 10, margin = 0.1):
+        """
+        Runs the experiment by generating data, fitting with SPSA and 
+        controling with gradient descent and statevector
+        """
 
+        # Callback used to save data on the fly
         def callback(*args):
             self.history["loss"].append(args[2])
             self.history["params"].append(args[1])
@@ -129,15 +136,13 @@ class ApproxQSVMTest():
         self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight,optimizer=optimizer)
 
         
-
         if self._x_train is None:
             self.generate_data(M, M_test, margin,seed=self.seed)
         
         print('Starting qasm fit')
         h_fit = self.fit_model()
 
-        
-        
+        # Similar callback for the gradient descent control optimization
         def callback_sv(*args):
             self.history["loss_control"].append(args[2])
             self.history["params_control"].append(args[1])
@@ -147,27 +152,22 @@ class ApproxQSVMTest():
         optimizer_sv = GradientDescent(maxiter=self._control_steps,callback=callback_sv,learning_rate=0.001,perturbation=0.001)
         self._model_sv = VQC(self.d,reps=self._reps,quantum_instance=self._sv_instance,initial_point=self._weight, optimizer=optimizer_sv)
 
-        
-
         print('Controlling with statevector')
         h_sv = self.fit_statevector()
         self.history['h_sv'] = h_sv
         self.history['h'] = h_fit
-
-        #h_sv = self._true_h
-        #c_steps = 10
            
         num_evals = self._num_evals
-        #c_steps = len(self.history['loss_control'])
         c_steps = self._control_steps
 
         return h_fit, h_sv, num_evals, c_steps
     
     def save(self, filename):
+        """
+        Saves the history dictionary to a pickle file.
+        """
         f = open(f'features={self.d}/d={int(self.d * (self._reps+1))}/dumps/{filename}.pkl','wb')
         pickle.dump(self.history,f)
-
-
 
 
 def get_data_generated(qnn, M=100, margin=0.1, bias=0, shuffle=True, seed=41, return_theta=False,one_hot=True):
