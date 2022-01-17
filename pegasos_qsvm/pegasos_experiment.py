@@ -170,15 +170,15 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     for s in tqdm(seeds):
         algorithm_globals.random_seed = s
         # Run pegasos with statevector as reference
-        _, a, _ = pegasos(K,y,N,C,seed=s,full_returns=True)
+        _, a, _, _ = pegasos(K,y,N,C,seed=s,full_returns=True)
 
         for i, R in enumerate(shots):
             # Check whether this has already been calculated
-            if ((results['seed'] == s) & (results['R'] == s) & (results['C'] == C)).any():
+            if ((results['seed'] == s) & (results['R'] == R) & (results['C'] == C)).any():
                 continue
 
             # Run pegasos with finite shots 'R'
-            y2,a2,_,_ = pegasos(K_shots[i],y,N,C,mu=0,seed=s,full_returns=True)
+            y2, a2, _, _ = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
             # Calculating the errors on the weights
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             # Calculating accuracy on test and training set
@@ -190,7 +190,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
             # Saving results to csv
             results.loc[results.shape[0]] = [s, R, C, M] + accuracies.tolist() + accuracies_test.tolist() + errors_a.tolist()
-            results.to_csv(f'experiments/shots_margin{margin}_data.csv',index=False)
+            results.to_csv(f'data/margin{margin}_data.csv',index=False)
 
 def create_plots(filename,N):
     """
@@ -217,7 +217,7 @@ def create_plots(filename,N):
     for j, C in enumerate(Cs):
         for i, R in enumerate(shots):
             acc = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4:4 + N])
-            if acc.shape[0] is not 0:
+            if acc.shape[0] != 0:
                 acc_mean = np.mean(acc,axis=0)
                 acc_lower = np.quantile(acc, lower_percentile, axis=0)
                 acc_upper = np.quantile(acc, upper_percentile, axis=0)
@@ -225,7 +225,7 @@ def create_plots(filename,N):
                 axs_acc[j].fill_between(x, acc_lower[:N], acc_upper[:N], alpha=0.3, edgecolor=None)
 
             tacc = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + N:4 + 2*N])
-            if tacc.shape[0] is not 0:
+            if tacc.shape[0] != 0:
                 tacc_mean = np.mean(tacc,axis=0)
                 tacc_lower = np.quantile(tacc, lower_percentile, axis=0)
                 tacc_upper = np.quantile(tacc, upper_percentile, axis=0)
@@ -233,7 +233,7 @@ def create_plots(filename,N):
                 axs_tacc[j].fill_between(x, tacc_lower[:N], tacc_upper[:N], alpha=0.3, edgecolor=None)
 
             a = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + 2*N:])
-            if a.shape[0] is not 0:
+            if a.shape[0] != 0:
                 a_mean = np.mean(a,axis=0)
                 a_lower = np.quantile(a, lower_percentile, axis=0)
                 a_upper = np.quantile(a, upper_percentile, axis=0)
@@ -258,77 +258,26 @@ def create_plots(filename,N):
         axs_tacc[1].legend(loc='lower right')
         axs_acc[1].legend(loc='lower right')
         
-    fig_acc.savefig(filename[:-8] + f'acc_plot{N}.png',dpi=300,bbox_inches='tight')
-    fig_tacc.savefig(filename[:-8] + f'tacc_plot{N}.png',dpi=300,bbox_inches='tight')
-    fig_a.savefig(filename[:-8] + f'a_plot{N}.png',dpi=300,bbox_inches='tight')
+    fig_acc.savefig('plots' + filename[4:-8] + f'acc_plot.png',dpi=300,bbox_inches='tight')
+    fig_tacc.savefig('plots' + filename[4:-8] + f'tacc_plot.png',dpi=300,bbox_inches='tight')
+    fig_a.savefig('plots' + filename[4:-8] + f'a_plot.png',dpi=300,bbox_inches='tight')
         
 
    
         
 
 if __name__ == "__main__":
-    '''
     shots = [1,2,4,8,64,256,512,1024]
-    margin = 0.1
-    C = 10.
     N = 500
     M = 100
     M_test = 20
-    run_experiment(margin,C,N,shots,M,M_test,n_tests=100)
-    shots = [1,2,4,8,64,256,512,1024]
-    margin = 0.1
-    C = 1000.
-    N = 500
-    M = 100
-    M_test = 20
-    run_experiment(margin,C,N,shots,M,M_test,n_tests=100)
-    shots = [1,2,4,8,64,256,512,1024]
-    margin = -0.1
-    C = 10.
-    N = 500
-    M = 100
-    M_test = 20
-    run_experiment(margin,C,N,shots,M,M_test,n_tests=100)
-    shots = [1,2,4,8,64,256,512,1024]
-    margin = -0.1
-    C = 1000.
-    N = 500
-    M = 100
-    M_test = 20
-    run_experiment(margin,C,N,shots,M,M_test,n_tests=100)
-    '''
-    """
-    mus = [0,0.01,0.05,0.1,0.2]
-    margin = -0.1
-    C = 1000.
-    N = 500
-    M = 1000
-    M_test = 100
-    run_experiment(margin,C,N,mus,M,M_test)
-    mus = [0,0.01,0.05,0.1,0.2]
-    margin = 0.1
-    C = 10.
-    N = 500
-    M = 1000
-    M_test = 100
-    run_experiment(margin,C,N,mus,M,M_test)
-    """
-    """
-    mus = [0.5]
-    margin = -0.1
-    C = 10.
-    N = 500
-    M = 1000
-    M_test = 100
-    run_experiment(margin,C,N,mus,M,M_test)
-    mus = [0.5]
-    margin = -0.1
-    C = 1000.
-    N = 500
-    M = 1000
-    M_test = 100
-    run_experiment(margin,C,N,mus,M,M_test)
-    """
+    n_tests = 100
+    
+    margins = [0.1,-0.1]
+    Cs = [1000.,10.]
 
-    create_plots('experiments/shots_margin-0.1_data.csv',500,zoom=False)
-    create_plots('experiments/shots_margin0.1_data.csv',500,zoom=False)
+    for margin in margins:
+        for C in Cs:
+            run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
+        create_plots(f'data/margin{margin}_data.csv',N)
+   
