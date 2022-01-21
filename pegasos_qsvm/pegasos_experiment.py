@@ -150,7 +150,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     np.random.seed(41)
 
     # Statevector backend as referecne to calcualte epsilon
-    sv_backend = QuantumInstance(BasicAer.get_backend('statevector_simulator'))
+    sv_backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
     sv_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=sv_backend)
 
     # Kernel evaluation using statevector
@@ -161,7 +161,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     K_shots = np.zeros((len(shots),) + K.shape)
     print('Approximating Kernels')
     for i, R in tqdm(enumerate(shots)):
-        R_shots_backend = QuantumInstance(Aer.get_backend('qasm_simulator'),shots=Rshots,
+        R_shots_backend = QuantumInstance(Aer.get_backend('qasm_simulator'),shots=R,
                                 seed_simulator=41, seed_transpiler=41)
 
         R_shots_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=R_shots_backend)
@@ -284,7 +284,7 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     np.random.seed(41)
 
     # Change to qasm-simulator if noise is modelled via shots
-    adhoc_backend = QuantumInstance(BasicAer.get_backend('statevector_simulator'))
+    adhoc_backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
 
     adhoc_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=adhoc_backend)
 
@@ -296,7 +296,7 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     K_shots = np.zeros((len(shots),) + K.shape)
     print('Approximating Kernels')
     for i, R in tqdm(enumerate(shots)):
-        R_shots_backend = QuantumInstance(BasicAer.get_backend('qasm_simulator'), shots=R,
+        R_shots_backend = QuantumInstance(Aer.get_backend('qasm_simulator'), shots=R,
                             seed_simulator=41, seed_transpiler=41)
 
         R_shots_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=R_shots_backend)
@@ -346,7 +346,7 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
                 'hinge_loss' : hinges
             }
 
-            pickle.dump(history,open(f'data/dumps/{s}_R_{R}_C_{C}_M_{M}_margin_{margin}','wb'))
+            pickle.dump(history,open(f'data/dumps/{s}_R_{R}_C_{C}_M_{M}_margin_{margin}.pkl','wb'))
 
             results.loc[results.shape[0]] = [s, R, C, M, accuracies[-1], accuracies_test[-1], epsilons[-1], evals2[-1]]
             results.to_csv(f'data/advanced_margin_{margin}_data.csv',index=False)
