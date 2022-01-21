@@ -1,4 +1,4 @@
-from qiskit import BasicAer
+from qiskit import Aer
 from feature_maps import MediumFeatureMap
 from qiskit.utils import QuantumInstance, algorithm_globals
 from qiskit_machine_learning.kernels import QuantumKernel
@@ -161,7 +161,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     K_shots = np.zeros((len(shots),) + K.shape)
     print('Approximating Kernels')
     for i, R in tqdm(enumerate(shots)):
-        R_shots_backend = QuantumInstance(BasicAer.get_backend('qasm_simulator'), shots=R,
+        R_shots_backend = QuantumInstance(Aer.get_backend('qasm_simulator'),shots=Rshots,
                                 seed_simulator=41, seed_transpiler=41)
 
         R_shots_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=R_shots_backend)
@@ -314,13 +314,13 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
         for i, R in enumerate(shots):
             # Check whether this has already been calculated
-            if ((results['seed'] == s) & (results['R'] == s) & (results['C'] == C)).any():
+            if ((results['seed'] == s) & (results['R'] == R) & (results['C'] == C)).any():
                 continue
 
             y2,a2,_,evals2 = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             epsilons = np.array([np.max(np.abs(np.sum(y*(a2[i] - a[-1])*K,axis=1))) for i in range(len(a2))])
-            epsilons_2 = np.array([np.max(yp - y_state[-1]) for yp in y2])
+            epsilons_2 = np.array([np.max(np.abs(yp - y_state[-1])) for yp in y2])
 
             accuracies = accuracy(np.sign(y2),y)
             accuracies_test = np.zeros_like(accuracies)
