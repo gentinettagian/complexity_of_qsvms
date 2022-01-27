@@ -1,10 +1,11 @@
-from qiskit import BasicAer
+from qiskit import Aer
+from dual_qsvm.shot_based_kernel import ShotBasedQuantumKernel
 from feature_maps import MediumFeatureMap
 from qiskit.utils import QuantumInstance, algorithm_globals
 from qiskit_machine_learning.kernels import QuantumKernel
 from qiskit_machine_learning.algorithms.classifiers import QSVC
 
-
+from shot_based_kernel import ShotBasedQuantumKernel
 
 from quantum_neural_networks import QuantumNeuralNetwork
 from variational_forms import _VariationalForm
@@ -111,88 +112,87 @@ def accuracy(y1,y2):
 
 
 
-def run_experiment(margin,C,shots,M=100,M_test=10,n_tests=100):
+def run_experiment(margin,C,eps,Ms,n_tests=10):
 
     # Feature map for the experiment
     feature_map = MediumFeatureMap(2,4)
 
-    
-    
     # Checking whether experiment has already been partially done and loading existing data
     try:
-        results = pd.read_csv(f'experiments/M_{margin}_data.csv')
+        results = pd.read_csv(f'experiments/M2_{margin}_data.csv')
     except:
-        columns = ['seed','R','C','M','epsilon','epsilon_euclid1','epsilon_euclid2']
+        columns = ['seed','M','C','epsilon','shots']
         results = pd.DataFrame(columns=columns)
-        results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
+        results.to_csv(f'experiments/M2_{margin}_data.csv',index=False)
 
     np.random.seed(41)
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
 
-    
-    for s in tqdm(seeds):
-        algorithm_globals.random_seed = s
-        np.random.seed(s)
-
-        # Creating artificial data
-        (X,y), (Xt,yt) = generate_qsvm_data(feature_map,margin,M,M_test,seed=s)
-
-        state_backend = QuantumInstance(BasicAer.get_backend('statevector_simulator'))
-
-        state_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=state_backend)
-
-        qsvc = QSVC(quantum_kernel=state_kernel,C=C)
-        qsvc.fit(X,y)
-        h_state = qsvc.decision_function(X)
-
-        # Generating Kernels for different number of shots
-        print('Approximating Kernels')
-        for i, R in tqdm(enumerate(shots)):
-            # Check whether this has already been calculated
-            if ((results['seed'] == s) & (results['R'] == R) & (results['C'] == C) & (results['M'] == M)).any():
+    for M in tqdm(Ms):
+        for s in tqdm(seeds):
+            if ((results['seed'] == s) & (results['M'] == M) & (results['C'] == C) & (results['epsilon'] == eps)).any():
                 continue
 
-            R_shots_backend = QuantumInstance(BasicAer.get_backend('qasm_simulator'), shots=int(R),
-                                    seed_simulator=s, seed_transpiler=s)
+            algorithm_globals.random_seed = s
+            np.random.seed(s)
 
-            R_shots_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=R_shots_backend)
-            qsvc_R = QSVC(quantum_kernel=R_shots_kernel,C=C)
-            qsvc_R.fit(X,y)
-            h_R = qsvc_R.decision_function(X)
-            eps = np.max(np.abs(h_state - h_R))
-            eps_eucl1 = np.sum(np.abs(h_state - h_R)) / M # normalize
-            eps_eucl2 = np.linalg.norm(h_state - h_R,ord=2) / M # normalize
+            # Creating artificial data
+            (X,y), _ = generate_qsvm_data(feature_map,margin,M,0,seed=s)
 
-            results.loc[results.shape[0]] = [s, R, C, M, eps, eps_eucl1, eps_eucl2]
-            results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
+            # Calculating exact solution
+            state_backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
+            state_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=state_backend)
+            qsvc = QSVC(quantum_kernel=state_kernel,C=C)
+            qsvc.fit(X,y)
+            h_state = qsvc.decision_function(X)
+
+            # Calculating noisy solution
+            shots = 2**np.arange(2,20)
+            shots_based_kernel = ShotBasedQuantumKernel(state_kernel)
+            R_needed = -1
+            for R in shots:
+                R_shots_kernel = shots_based_kernel.approximate_kernel(R,s)
+                qsvc_R = QSVC(quantum_kernel=R_shots_kernel,C=C)
+                qsvc_R.fit(X,y)
+                h_R = qsvc_R.decision_function(X)
+                e = np.max(np.abs(h_state - h_R))
+                if e < eps:
+                    # Solution accurate enough
+                    R_needed = R
+                    break
+            
+            results.loc[results.shape[0]] = [s, M, C, eps, R_needed]
+            results.to_csv(f'experiments/M2_{margin}_data.csv',index=False)
+            
 
    
 
 if __name__ == "__main__":
 
-    Ms = np.arange(2,20,2) #[50] #
-    shots = np.geomspace(10,10000,100,dtype=int) #[4,8,16,32,64,128,256,512,1024,2048,4096] 
-    M_test = 0
+    Ms = 2**np.arange(2,12)
 
-    margin = 0.1
+    epsilons = [0.3,0.2,0.1,0.08,0.05,0.03,0.02,0.01]
     C = 10.
-    for M in Ms:
-        run_experiment(margin,C,shots,M,M_test,n_tests=10)
-
-    margin = -0.1
-    C = 10.
-    for M in Ms:
-        run_experiment(margin,C,shots,M,M_test,n_tests=10)
-    
     margin = 0.1
-    C = 1000.
-    for M in Ms:
-        run_experiment(margin,C,shots,M,M_test,n_tests=10)
 
+    for eps in epsilons:
+        run_experiment(margin,C,eps,Ms)
+
+    C = 1000.
+    margin = 0.1
+
+    for eps in epsilons:
+        run_experiment(margin,C,eps,Ms)
+
+    C = 10.
     margin = -0.1
-    C = 1000.
-    for M in Ms:
-        run_experiment(margin,C,shots,M,M_test,n_tests=10)
 
-    
+    for eps in epsilons:
+        run_experiment(margin,C,eps,Ms)
+
+    C = 1000.
+    margin = -0.1
+
+    for eps in epsilons:
+        run_experiment(margin,C,eps,Ms)
