@@ -1,5 +1,4 @@
 from qiskit import Aer
-from dual_qsvm.shot_based_kernel import ShotBasedQuantumKernel
 from feature_maps import MediumFeatureMap
 from qiskit.utils import QuantumInstance, algorithm_globals
 from qiskit_machine_learning.kernels import QuantumKernel
@@ -14,6 +13,9 @@ from feature_maps import MediumFeatureMap
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
+from my_svc import MySVC
+from sklearn.svm import SVC
 
 import pickle
 
@@ -119,21 +121,21 @@ def run_experiment(margin,C,eps,Ms,n_tests=10):
 
     # Checking whether experiment has already been partially done and loading existing data
     try:
-        results = pd.read_csv(f'experiments/M2_{margin}_data.csv')
+        results = pd.read_csv(f'experiments/M_{margin}_data.csv')
     except:
         columns = ['seed','M','C','epsilon','shots']
         results = pd.DataFrame(columns=columns)
-        results.to_csv(f'experiments/M2_{margin}_data.csv',index=False)
+        results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
 
     np.random.seed(41)
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
 
     for M in tqdm(Ms):
+        print(f'M = {M}')
         for s in tqdm(seeds):
             if ((results['seed'] == s) & (results['M'] == M) & (results['C'] == C) & (results['epsilon'] == eps)).any():
                 continue
-
             algorithm_globals.random_seed = s
             np.random.seed(s)
 
@@ -143,19 +145,19 @@ def run_experiment(margin,C,eps,Ms,n_tests=10):
             # Calculating exact solution
             state_backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
             state_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=state_backend)
-            qsvc = QSVC(quantum_kernel=state_kernel,C=C)
-            qsvc.fit(X,y)
-            h_state = qsvc.decision_function(X)
-
+            state_matrix = state_kernel.evaluate(X)
+            svc = SVC(kernel='precomputed',C=C)
+            svc.fit(state_matrix,y)
+            h_state = svc.decision_function(state_matrix)
             # Calculating noisy solution
             shots = 2**np.arange(2,20)
-            shots_based_kernel = ShotBasedQuantumKernel(state_kernel)
+            shots_based_kernel = ShotBasedQuantumKernel(state_matrix)
             R_needed = -1
             for R in shots:
                 R_shots_kernel = shots_based_kernel.approximate_kernel(R,s)
-                qsvc_R = QSVC(quantum_kernel=R_shots_kernel,C=C)
-                qsvc_R.fit(X,y)
-                h_R = qsvc_R.decision_function(X)
+                svc_R = SVC(kernel='precomputed',C=C)
+                svc_R.fit(R_shots_kernel,y)
+                h_R = svc_R.decision_function(R_shots_kernel)
                 e = np.max(np.abs(h_state - h_R))
                 if e < eps:
                     # Solution accurate enough
@@ -163,7 +165,7 @@ def run_experiment(margin,C,eps,Ms,n_tests=10):
                     break
             
             results.loc[results.shape[0]] = [s, M, C, eps, R_needed]
-            results.to_csv(f'experiments/M2_{margin}_data.csv',index=False)
+            results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
             
 
    
