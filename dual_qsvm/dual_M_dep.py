@@ -109,92 +109,110 @@ def generate_qsvm_data(feature_map,margin,M,M_test=None,seed=41):
     else:
         return (X[:M], y[:M]), (X[M:], y[M:])
 
-def accuracy(y1,y2):
-    return (1. - np.sum(np.abs(y1 - y2),axis=-1)/(2.*len(y1)))
+class DualExperiment():
+    def __init__(self, margin, Cs = [10,1000], Ms = 2**np.arange(2,12), shots = 2**np.arange(2,20),
+        qubits = 2, reps = 4, seed = 42):
+        self.margin = margin
+        self.Cs = Cs
+        self.Ms = Ms
+        self.shots = shots
+        self.seed = seed
+        self.qubits = qubits
+        self.reps = reps
 
+        self.feature_map = MediumFeatureMap(self.qubits, self.reps)
+        
 
+    def generate_data(self):
+        max_M = 2048 #np.max(self.Ms)
+        try:
+            X = pd.read_csv(f'data/{self.qubits}-qubits/X_{max_M}.csv')
+            y = pd.read_csv(f'data/{self.qubits}-qubits/y_{max_M}.csv')
+        except:
+            (X,y), _ = generate_qsvm_data(self.feature_map,self.margin,max_M,0,self.seed)
+            X = pd.DataFrame(X)
+            X.to_csv(f'data/{self.qubits}-qubits/X_{max_M}.csv',index=False)
+            y = pd.DataFrame(y)
+            y.to_csv(f'data/{self.qubits}-qubits/y_{max_M}.csv',index=False)
+        
+        self.X = np.array(X)
+        self.y = np.array(y).reshape(-1)
 
-def run_experiment(margin,C,eps,Ms,n_tests=10):
+        return X,y
+    
+    def load_data(self, M, seed = 42):
+        assert (M <= 2048) & (M % 2 == 0)
+        np.random.seed(seed)
+        indices1 = np.random.randint(0,np.sum(self.y == 1),M//2)
+        indices2 = np.random.randint(0,np.sum(self.y == -1),M//2)
 
-    # Feature map for the experiment
-    feature_map = MediumFeatureMap(2,4)
+        X1 = self.X[self.y == 1][indices1]
+        y1 = self.y[self.y == 1][indices1]
+        X2 = self.X[self.y == -1][indices2]
+        y2 = self.y[self.y == -1][indices1]
 
-    # Checking whether experiment has already been partially done and loading existing data
-    try:
-        results = pd.read_csv(f'experiments/M_{margin}_data.csv')
-    except:
-        columns = ['seed','M','C','epsilon','shots']
-        results = pd.DataFrame(columns=columns)
-        results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
+        X = np.vstack([X1,X2])
+        y = np.append(y1,y2)
 
-    np.random.seed(41)
-    # Repeating experiment for 100 seeds
-    seeds = np.random.randint(1,1e5,n_tests)
+        shuffle = np.random.choice(M, M, replace=False)
+        return X[shuffle], y[shuffle]
 
-    for M in tqdm(Ms):
-        print(f'M = {M}')
-        for s in tqdm(seeds):
-            if ((results['seed'] == s) & (results['M'] == M) & (results['C'] == C) & (results['epsilon'] == eps)).any():
-                continue
-            algorithm_globals.random_seed = s
-            np.random.seed(s)
+    def run(self, seed = 42):
+        self.generate_data()
+        try:
+            results = pd.read_csv(f'experiments/M_{self.margin}_data.csv')
+        except:
+            columns = ['seed','R','C','M','epsilon','epsilon_euclid1','epsilon_euclid2']
+            results = pd.DataFrame(columns=columns)
+            results.to_csv(f'experiments/M_{self.margin}_data.csv',index=False)
 
-            # Creating artificial data
-            (X,y), _ = generate_qsvm_data(feature_map,margin,M,0,seed=s)
+        for M in tqdm(self.Ms):
+            print(f'M = {M}')
+            X, y = self.load_data(M,seed)
 
-            # Calculating exact solution
             state_backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
-            state_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=state_backend)
+            state_kernel = QuantumKernel(feature_map=self.feature_map.get_reduced_params_circuit(), quantum_instance=state_backend)
             state_matrix = state_kernel.evaluate(X)
-            svc = SVC(kernel='precomputed',C=C)
-            svc.fit(state_matrix,y)
-            h_state = svc.decision_function(state_matrix)
-            # Calculating noisy solution
-            shots = 2**np.arange(2,20)
-            shots_based_kernel = ShotBasedQuantumKernel(state_matrix)
-            R_needed = -1
-            for R in shots:
-                R_shots_kernel = shots_based_kernel.approximate_kernel(R,s)
-                svc_R = SVC(kernel='precomputed',C=C)
-                svc_R.fit(R_shots_kernel,y)
-                h_R = svc_R.decision_function(R_shots_kernel)
-                e = np.max(np.abs(h_state - h_R))
-                if e < eps:
-                    # Solution accurate enough
-                    R_needed = R
-                    break
-            
-            results.loc[results.shape[0]] = [s, M, C, eps, R_needed]
-            results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
-            
 
-   
+            for C in self.Cs:
+                svc = SVC(kernel='precomputed',C=C)
+                svc.fit(state_matrix,y)
+                h_state = svc.decision_function(state_matrix)
 
+                # Calculating noisy solution
+                shots_based_kernel = ShotBasedQuantumKernel(state_matrix)
+
+                for R in self.shots:
+                    if ((results['seed'] == seed) & (results['R'] == R) & (results['C'] == C) & (results['M'] == M)).any():
+                        continue
+                    
+                    R_shots_kernel = shots_based_kernel.approximate_kernel(R,seed)
+                    svc_R = SVC(kernel='precomputed',C=C)
+                    svc_R.fit(R_shots_kernel,y)
+                    h_R = svc_R.decision_function(R_shots_kernel)
+                    eps = np.max(np.abs(h_state - h_R))
+
+                    eps_eucl1 = np.sum(np.abs(h_state - h_R)) / M # normalize
+                    eps_eucl2 = np.linalg.norm(h_state - h_R,ord=2) / M # normalize
+
+                    results.loc[results.shape[0]] = [seed, R, C, M, eps, eps_eucl1, eps_eucl2]
+                    results.to_csv(f'experiments/M_{margin}_data.csv',index=False)
+
+    
+        
 if __name__ == "__main__":
 
-    Ms = 2**np.arange(2,12)
+    Ms = 2**np.arange(2,9)
+    shots = 2**np.arange(2,22)
+    n_seeds = 5
 
-    epsilons = [0.3,0.2,0.1,0.08,0.05,0.03,0.02,0.01]
-    C = 10.
-    margin = 0.1
 
-    for eps in epsilons:
-        run_experiment(margin,C,eps,Ms)
+    np.random.seed(43)
+    seeds = np.random.randint(0,1e8,n_seeds)
+    
+   
 
-    C = 1000.
-    margin = 0.1
-
-    for eps in epsilons:
-        run_experiment(margin,C,eps,Ms)
-
-    C = 10.
     margin = -0.1
-
-    for eps in epsilons:
-        run_experiment(margin,C,eps,Ms)
-
-    C = 1000.
-    margin = -0.1
-
-    for eps in epsilons:
-        run_experiment(margin,C,eps,Ms)
+    experiment = DualExperiment(margin,Ms=Ms,shots=shots)
+    for s in seeds:
+        experiment.run(s)

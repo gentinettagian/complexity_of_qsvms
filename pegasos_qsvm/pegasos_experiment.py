@@ -257,9 +257,9 @@ def create_plots(filename,N):
             axs_tacc[j].set(ylabel=fr'Test accuracy, $\lambda = {1/C}$',xlabel='Iterations')
             axs_a[j].set(ylabel=r'$\lambda\, ||\mathbf{\alpha}_R - \mathbf{\alpha}||,\quad \lambda = 0.1$',xlabel='Iterations')
 
-        axs_a[0].legend(loc='upper right')
-        axs_tacc[1].legend(loc='lower right')
-        axs_acc[1].legend(loc='lower right')
+        #axs_a[0].legend(loc='upper right')
+        #axs_tacc[1].legend(loc='lower right')
+        #axs_acc[1].legend(loc='lower right')
         
     fig_acc.savefig('plots' + filename[4:-8] + f'acc_plot.png',dpi=300,bbox_inches='tight')
     fig_tacc.savefig('plots' + filename[4:-8] + f'tacc_plot.png',dpi=300,bbox_inches='tight')
