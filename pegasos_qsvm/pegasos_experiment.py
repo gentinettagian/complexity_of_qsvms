@@ -166,10 +166,6 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
     # Generating Kernels for different number of shots
     shots_kernel = ShotBasedQuantumKernel(K)
-    K_shots = np.zeros((len(shots),) + K.shape)
-
-    for i, R in enumerate(shots):
-        K_shots[i] = shots_kernel.approximate_kernel(R)
 
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
@@ -185,10 +181,10 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
                 continue
             
             # Approximate Kernel
-            #K_shots = shots_kernel.approximate_kernel(R,seed=s)
+            K_shots = shots_kernel.approximate_kernel(R,seed=s)
 
             # Run pegasos with finite shots 'R'
-            y2, a2, _, _ = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
+            y2, a2, _, _ = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
             # Calculating the errors on the weights
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             # Calculating accuracy on test and training set
@@ -308,8 +304,6 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     shots_kernel = ShotBasedQuantumKernel(K)
     K_shots = np.zeros((len(shots),) + K.shape)
     
-    for i, R in enumerate(shots):
-        K_shots[i] = shots_kernel.approximate_kernel(R)
 
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
@@ -325,8 +319,8 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
             # Check whether this has already been calculated
             if ((results['seed'] == s) & (results['R'] == R) & (results['C'] == C)).any():
                 continue
-            #K_shots = shots_kernel.approximate_kernel(R,seed=s)
-            y2,a2,_,evals2 = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
+            K_shots = shots_kernel.approximate_kernel(R,seed=s)
+            y2,a2,_,evals2 = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             epsilons = np.array([np.max(np.abs(np.sum(y*(a2[i] - a[-1])*K,axis=1))) for i in range(len(a2))])
             epsilons_2 = np.array([np.max(np.abs(yp - y_state[-1])) for yp in y2])
