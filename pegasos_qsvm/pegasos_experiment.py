@@ -1,3 +1,4 @@
+import enum
 from qiskit import Aer
 from feature_maps import MediumFeatureMap
 from qiskit.utils import QuantumInstance, algorithm_globals
@@ -143,14 +144,14 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     
     # Checking whether experiment has already been partially done and loading existing data
     try:
-        results = pd.read_csv(f'data/margin{margin}_data{N}.csv')
+        results = pd.read_csv(f'data/oneK_{margin}_data{N}.csv')
     except:
         columns = ['seed','R','C','M']
         columns += [f'train acc. it. {n}' for n in range(N)]
         columns += [f'test acc. it. {n}' for n in range(N)]
         columns += [f'a error it. {n}' for n in range(N)]
         results = pd.DataFrame(columns=columns)
-        results.to_csv(f'data/margin{margin}_data{N}.csv',index=False)
+        results.to_csv(f'data/oneK_{margin}_data{N}.csv',index=False)
 
     # Fix random seed to make reproducable
     np.random.seed(41)
@@ -163,7 +164,12 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     K = sv_kernel.evaluate(x_vec=X)
     K_test = sv_kernel.evaluate(x_vec=Xt,y_vec=X)
 
-    shotKernel = ShotBasedQuantumKernel(K)
+    # Generating Kernels for different number of shots
+    shots_kernel = ShotBasedQuantumKernel(K)
+    K_shots = np.zeros((len(shots),) + K.shape)
+
+    for i, R in enumerate(shots):
+        K_shots[i] = shots_kernel.approximate_kernel(R)
 
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
@@ -179,10 +185,10 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
                 continue
             
             # Approximate Kernel
-            K_shots = shotKernel.approximate_kernel(R,seed=s)
+            #K_shots = shots_kernel.approximate_kernel(R,seed=s)
 
             # Run pegasos with finite shots 'R'
-            y2, a2, _, _ = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
+            y2, a2, _, _ = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
             # Calculating the errors on the weights
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             # Calculating accuracy on test and training set
@@ -194,7 +200,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
             # Saving results to csv
             results.loc[results.shape[0]] = [s, R, C, M] + accuracies.tolist() + accuracies_test.tolist() + errors_a.tolist()
-            results.to_csv(f'data/margin{margin}_data{N}.csv',index=False)
+            results.to_csv(f'data/oneK_{margin}_data{N}.csv',index=False)
 
 def create_plots(filename,N,legend=True,shots=None,upto=None):
     """
@@ -300,6 +306,10 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
     # Generating Kernels for different number of shots
     shots_kernel = ShotBasedQuantumKernel(K)
+    K_shots = np.zeros((len(shots),) + K.shape)
+    
+    for i, R in enumerate(shots):
+        K_shots[i] = shots_kernel.approximate_kernel(R)
 
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
@@ -315,8 +325,8 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
             # Check whether this has already been calculated
             if ((results['seed'] == s) & (results['R'] == R) & (results['C'] == C)).any():
                 continue
-            K_shots = shots_kernel.approximate_kernel(R,seed=s)
-            y2,a2,_,evals2 = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
+            #K_shots = shots_kernel.approximate_kernel(R,seed=s)
+            y2,a2,_,evals2 = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             epsilons = np.array([np.max(np.abs(np.sum(y*(a2[i] - a[-1])*K,axis=1))) for i in range(len(a2))])
             epsilons_2 = np.array([np.max(np.abs(yp - y_state[-1])) for yp in y2])
@@ -366,8 +376,8 @@ if __name__ == "__main__":
 
     for margin in margins:
         for C in Cs:
-            continue
-            #run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
+            #continue
+            run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
         legend = margin < 0
-        create_plots(f'data/margin{margin}_data{N}.csv',N,legend,shots,upto=500)
+        create_plots(f'data/oneK_{margin}_data{N}.csv',N,legend,shots,upto=500)
    
