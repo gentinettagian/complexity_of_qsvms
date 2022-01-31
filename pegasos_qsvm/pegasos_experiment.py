@@ -299,14 +299,7 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     K_test = adhoc_kernel.evaluate(x_vec=Xt,y_vec=X)
 
     # Generating Kernels for different number of shots
-    K_shots = np.zeros((len(shots),) + K.shape)
-    print('Approximating Kernels')
-    for i, R in tqdm(enumerate(shots)):
-        R_shots_backend = QuantumInstance(Aer.get_backend('qasm_simulator'), shots=R,
-                            seed_simulator=41, seed_transpiler=41)
-
-        R_shots_kernel = QuantumKernel(feature_map=feature_map.get_reduced_params_circuit(), quantum_instance=R_shots_backend)
-        K_shots[i] = R_shots_kernel.evaluate(x_vec=X)
+    shots_kernel = ShotBasedQuantumKernel(K)
 
     # Repeating experiment for 100 seeds
     seeds = np.random.randint(1,1e5,n_tests)
@@ -322,8 +315,8 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
             # Check whether this has already been calculated
             if ((results['seed'] == s) & (results['R'] == R) & (results['C'] == C)).any():
                 continue
-
-            y2,a2,_,evals2 = pegasos(K_shots[i],y,N,C,seed=s,full_returns=True)
+            K_shots = shots_kernel.approximate_kernel(R,seed=s)
+            y2,a2,_,evals2 = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             epsilons = np.array([np.max(np.abs(np.sum(y*(a2[i] - a[-1])*K,axis=1))) for i in range(len(a2))])
             epsilons_2 = np.array([np.max(np.abs(yp - y_state[-1])) for yp in y2])
