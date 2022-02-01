@@ -126,14 +126,14 @@ class DualExperiment():
     def generate_data(self):
         max_M = 2048 #np.max(self.Ms)
         try:
-            X = pd.read_csv(f'data/{self.qubits}-qubits/X_{max_M}.csv')
-            y = pd.read_csv(f'data/{self.qubits}-qubits/y_{max_M}.csv')
+            X = pd.read_csv(f'data/{self.qubits}-qubits/{self.margin}_X_{max_M}.csv')
+            y = pd.read_csv(f'data/{self.qubits}-qubits/{self.margin}_y_{max_M}.csv')
         except:
             (X,y), _ = generate_qsvm_data(self.feature_map,self.margin,max_M,0,self.seed)
             X = pd.DataFrame(X)
-            X.to_csv(f'data/{self.qubits}-qubits/X_{max_M}.csv',index=False)
+            X.to_csv(f'data/{self.qubits}-qubits/{self.margin}_X_{max_M}.csv',index=False)
             y = pd.DataFrame(y)
-            y.to_csv(f'data/{self.qubits}-qubits/y_{max_M}.csv',index=False)
+            y.to_csv(f'data/{self.qubits}-qubits/{self.margin}_y_{max_M}.csv',index=False)
         
         self.X = np.array(X)
         self.y = np.array(y).reshape(-1)
@@ -202,8 +202,8 @@ class DualExperiment():
         
 if __name__ == "__main__":
 
-    Ms = 2**np.arange(2,9)
-    shots = 2**np.arange(2,22)
+    Ms = 2**np.arange(5,9)
+    shots = 2**np.arange(22,25)
     n_seeds = 5
 
 

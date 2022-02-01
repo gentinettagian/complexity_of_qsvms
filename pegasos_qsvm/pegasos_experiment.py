@@ -11,7 +11,6 @@ from quantum_neural_networks import QuantumNeuralNetwork
 from variational_forms import _VariationalForm
 from feature_maps import MediumFeatureMap
 
-from sklearn.metrics import hinge_loss
 
 import pickle
 
@@ -126,6 +125,12 @@ def accuracy(y1,y2):
         n = len(y1)
     return np.sum(y1 == y2,axis=-1)/n
 
+def hinge_loss(y_true,y_pred):
+    loss = 1. - y_true*y_pred
+    loss[loss < 0 ] = 0.0
+    return loss
+
+
 def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     """Runs experiments for the Pegasos algorithms and saves results to a csv file.
     margin.. Margin between the data classes. Positive for separable, negative for overlapping
@@ -198,7 +203,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
             results.loc[results.shape[0]] = [s, R, C, M] + accuracies.tolist() + accuracies_test.tolist() + errors_a.tolist()
             results.to_csv(f'data/oneK_{margin}_data{N}.csv',index=False)
 
-def create_plots(filename,N,legend=True,shots=None,upto=None):
+def create_plots(filename,margin,N,legend=True,shots=None,upto=None):
     """
     Loads the data from 'filename' and creates plots for training and test accuracy, as well as 
     plots showing the evolution of the error on the weights alpha
@@ -230,9 +235,12 @@ def create_plots(filename,N,legend=True,shots=None,upto=None):
                 acc_mean = np.mean(acc,axis=0)
                 acc_lower = np.quantile(acc, lower_percentile, axis=0)
                 acc_upper = np.quantile(acc, upper_percentile, axis=0)
+                
                 axs_acc[j].plot(x, acc_mean[:upto], label=f'$R={int(R)}$',color=cols[i])
+                #axs_acc[j].plot(x, acc_mean[:upto], label=f'$R={int(R)}$')
                 axs_acc[j].set_ylim(0.2,1)
                 axs_acc[j].fill_between(x, acc_lower[:upto], acc_upper[:upto], alpha=0.3, edgecolor=None,color=cols[i])
+                #axs_acc[j].fill_between(x, acc_lower[:upto], acc_upper[:upto], alpha=0.3, edgecolor=None)
 
             tacc = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + N:4 + 2*N])
             if tacc.shape[0] != 0:
@@ -248,7 +256,9 @@ def create_plots(filename,N,legend=True,shots=None,upto=None):
                 a_lower = np.quantile(a, lower_percentile, axis=0)
                 a_upper = np.quantile(a, upper_percentile, axis=0)
                 axs_a[j].plot(x, (a_mean/C)[:upto], label=f'$R={int(R)}$',color=cols[i])
+                #axs_a[j].plot(x, (a_mean/C)[:upto], label=f'$R={int(R)}$')
                 axs_a[j].fill_between(x, (a_lower/C)[:upto], (a_upper/C)[:upto], alpha=0.3, edgecolor=None,color=cols[i])
+                #axs_a[j].fill_between(x, (a_lower/C)[:upto], (a_upper/C)[:upto], alpha=0.3, edgecolor=None)
 
         axs_acc[j].grid()
         axs_tacc[j].grid()
@@ -269,9 +279,8 @@ def create_plots(filename,N,legend=True,shots=None,upto=None):
             axs_tacc[1].legend(loc='lower right')
             axs_acc[1].legend(loc='lower right')
         
-    fig_acc.savefig('plots' + filename[4:-8] + f'acc_plot.png',dpi=300,bbox_inches='tight')
-    fig_tacc.savefig('plots' + filename[4:-8] + f'tacc_plot.png',dpi=300,bbox_inches='tight')
-    fig_a.savefig('plots' + filename[4:-8] + f'a_plot.png',dpi=300,bbox_inches='tight')
+    fig_acc.savefig(f'plots/margin{margin}_accuracy.png',dpi=300,bbox_inches='tight')
+    fig_a.savefig(f'plots/margin{margin}a_plot.png',dpi=300,bbox_inches='tight')
         
 
 def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
@@ -285,7 +294,7 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     try:
         results = pd.read_csv(f'data/advanced_margin_{margin}_data.csv')
     except:
-        columns = ['seed','R','C','M','train acc','test acc','epsilon','evaluations']
+        columns = ['seed','R','C','M','train acc','epsilon','evaluations']
         results = pd.DataFrame(columns=columns)
         results.to_csv(f'data/advanced_margin_{margin}_data.csv',index=False)
 
@@ -326,16 +335,11 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
             epsilons_2 = np.array([np.max(np.abs(yp - y_state[-1])) for yp in y2])
 
             accuracies = accuracy(np.sign(y2),y)
-            accuracies_test = np.zeros_like(accuracies)
-            for n in range(N):
-                y_n = np.sign((a2[n,:] * y) @ K_test.T)
-                accuracies_test[n] = accuracy(y_n,yt)
 
             hinges = np.array([hinge_loss(y,y_i) for y_i in y2]) 
 
             history = {
                 'train_accuracy' : accuracies,
-                'test_accuracy' : accuracies_test,
                 'a_exact' : a,
                 'a_noisy' : a2,
                 'errors_a' : errors_a,
@@ -351,15 +355,15 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
             pickle.dump(history,open(f'data/dumps/{s}_R_{R}_C_{C}_M_{M}_margin_{margin}.pkl','wb'))
 
-            results.loc[results.shape[0]] = [s, R, C, M, accuracies[-1], accuracies_test[-1], epsilons[-1], evals2[-1]]
+            results.loc[results.shape[0]] = [s, R, C, M, accuracies[-1], epsilons[-1], evals2[-1]]
             results.to_csv(f'data/advanced_margin_{margin}_data.csv',index=False)
 
 
 
 
 if __name__ == "__main__":
-    shots = [1,2,4,8,64,256,512,1024]
-    shots = [1,2,8,256,1024]
+    shots = [1,2,8,16,32,64,128,256,512,1024]
+    shots = [1,2,8,32,128,1024]
     N = 500
     M = 100
     M_test = 20
@@ -370,8 +374,8 @@ if __name__ == "__main__":
 
     for margin in margins:
         for C in Cs:
-            #continue
-            run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
+            continue
+            #run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
         legend = margin < 0
-        create_plots(f'data/oneK_{margin}_data{N}.csv',N,legend,shots,upto=500)
+        create_plots(f'data/oneK_{margin}_data{N}.csv',margin,N,legend,shots)
    
