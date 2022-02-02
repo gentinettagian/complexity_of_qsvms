@@ -202,8 +202,8 @@ class DualExperiment():
         
 if __name__ == "__main__":
 
-    Ms = 2**np.arange(5,9)
-    shots = 2**np.arange(22,25)
+    Ms = 2**np.arange(2,9)
+    shots = 2**np.arange(2,22)
     n_seeds = 5
 
 
