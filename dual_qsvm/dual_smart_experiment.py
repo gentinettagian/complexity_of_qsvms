@@ -67,7 +67,7 @@ class SmartExperiment():
         self.minimal_R = np.zeros((len(self.Ms), self.estimations, len(self.epsilons)))
         
         results = pd.DataFrame(columns=['M', 'seed'] + [eps for eps in self.epsilons])
-        results.to_csv(f'experiments/smart_experiment_{self.margin}.csv',index=False)
+        #results.to_csv(f'experiments/smart_experiment_{self.margin}.csv',index=False)
 
         np.random.seed(self.seed)
         seeds = np.random.randint(0,1000,self.estimations)
@@ -113,7 +113,7 @@ class SmartExperiment():
                 self.minimal_R[i, l, :] = np.ceil(shots_for_kernel_error(errors_for_eps))
                 results.loc[results.shape[0]] = [M, seeds[l]] + [R for R in self.minimal_R[i, l, :]]
             
-            results.to_csv(f'experiments/smart_experiment_{self.margin}.csv',index=False)
+            #results.to_csv(f'experiments/smart_experiment_{self.margin}.csv',index=False)
 
         return
         
