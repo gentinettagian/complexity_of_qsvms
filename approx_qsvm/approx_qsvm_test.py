@@ -132,7 +132,7 @@ class ApproxQSVMTest():
             self._weight = args[1]
             self._num_evals = args[0]
             n = len(self.history['loss'])
-            if n % 100 == 0:
+            if (n % 100 == 1) or (n < 100 and n % 10 == 1):
                 h_pred = self._model.neural_network.forward(self._x_train, self._weight)
                 y_pred = [[0,1] if p[0] < p[1] else [1,0] for p in h_pred]
                 acc = np.sum(y_pred == self._y_train)/(2*len(y_pred))
@@ -249,7 +249,7 @@ if __name__ == '__main__':
     seeds = np.random.randint(0,100000,100)
     reps = 3
     features = 2
-    margin = 0.1
+    margin = -0.1
     sep = 'separable' if margin > 0 else 'overlap'
     try:
         df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_{sep}.csv')
@@ -264,6 +264,8 @@ if __name__ == '__main__':
     for s in seeds:
         for R in Rs:
             print(f'Seed {s}, {R} shots.')
+            if np.any((df['Seed'] == s) & (df['Shots'] == R)):
+                continue
             test = ApproxQSVMTest(Rshots=R,d=features,num_steps=n,seed=s,reps=reps,control_steps=c)
             h, h_sv, n_evals, c_effective = test.run_experiment(margin=margin)
             test.save(f'{sep}_spsa_sgd_seed_{s}_R_{R}_steps_{n_evals}_csteps_{c_effective}')
