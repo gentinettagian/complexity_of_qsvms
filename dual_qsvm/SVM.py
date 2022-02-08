@@ -38,11 +38,14 @@ class SVM():
         C = np.eye(len(y))
         b = np.zeros(len(y))
 
-        sol = qp.solve_qp(G, a, C, b)
+        try:
+            sol = qp.solve_qp(G, a, C, b)
+        except:
+            return False
         self._alphas = sol[0]
         if self._cut_near_zeros:
             self._alphas[self._alphas < 1e-10] = 0
-            
+
         self._support = self._alphas != 0
         self._dual_coef = self._alphas * y
         self._objective = sol[1]
@@ -57,7 +60,7 @@ class SVM():
 
 
 
-        return sol[1]
+        return True
 
     def decision_function(self, K):
         return (K @ self._dual_coef).reshape(-1)

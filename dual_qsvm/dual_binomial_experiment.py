@@ -8,7 +8,7 @@ from feature_maps import MediumFeatureMap
 from qiskit.utils import QuantumInstance, algorithm_globals
 from qiskit_machine_learning.kernels import QuantumKernel
 from qiskit import Aer
-from sklearn.svm import SVC
+from SVM import SVM
 from shot_based_kernel import BinomialKernel
 
 
@@ -45,7 +45,7 @@ class BinomialExperiment():
         self.margin = margin
         self.Ms = Ms
         self.seed = seed
-        self.epsilons = epsilons
+        self.epsilons = np.array(epsilons)
         self.shots = shots
         self.estimations = estimations
         self.C = C
@@ -68,19 +68,17 @@ class BinomialExperiment():
             results = pd.DataFrame(columns=['M', 'seed'] + [eps for eps in self.epsilons])
             results.to_csv(f'experiments/binomial_experiment_{self.margin}_C_{self.C}.csv',index=False)
 
-        np.random.seed(self.seed)
-        seeds = np.random.randint(0,1000,self.estimations)
+        rng = np.random.default_rng(self.seed)
+        seeds = rng.choice(10000, size=self.estimations, replace=False)
 
         for i, M in enumerate(self.Ms):
-            if np.any(results['M'] == M):
-                continue
             # Exact kernel
             X, y = self.load_data(M,self.seed)
             K = self.kernel.evaluate(X)
             K[K > 1] = 1
             K[K < 0] = 0
             
-            svc = SVC(kernel='precomputed',C=self.C,random_state=42)
+            svc = SVM(kernel='precomputed',C=self.C)
             svc.fit(K,y)
             h_exact = svc.decision_function(K)
 
@@ -129,9 +127,6 @@ class BinomialExperiment():
             p = np.polyfit(np.log(self.Ms), np.log(means), 1)
             exponents[i] = p[0]
             plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
-            capsize=2, color=colors[i], ms=10, label = r'$\varepsilon = {{%s}}, \quad R \propto M^{{%.2f}}'%(eps, p[0]))
-
-            plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
             capsize=2, color=colors[i], ms=10, label = r'$\varepsilon = {{%s}}, \quad R \propto M^{{%.2f}}$'%(eps, p[0]))
 
             M_fine = np.geomspace(np.min(self.Ms),np.max(self.Ms))
@@ -144,22 +139,20 @@ class BinomialExperiment():
         plt.legend()
         plt.xlabel(r'Data size $M$')
         plt.ylabel(r'Total number of shots $R$')
-        plt.show()
+        #plt.show()
         sep = 'separable' if self.margin > 0 else 'overlap'
-<<<<<<< HEAD
         plt.savefig(f'plots/binomial_experiment_{sep}_C_{self.C}.png',dpi=300,bbox_inches='tight')
-=======
-        #plt.savefig(f'plots/binomial_experiment_{sep}.png',dpi=300,bbox_inches='tight')
->>>>>>> eb73f165764c218b9196c607db63edca8b19b7c3
 
         return exponents
             
     
     def get_epsilon(self, h_exact, K_R, y):
-        svc_R = SVC(kernel='precomputed',C=self.C,random_state=42)
-        svc_R.fit(K_R,y)
-        h_R = svc_R.decision_function(K_R)
-        return np.max(np.abs(h_R - h_exact))
+        svc_R = SVM(kernel='precomputed',C=self.C)
+        if svc_R.fit(K_R,y):
+            h_R = svc_R.decision_function(K_R)
+            return np.max(np.abs(h_R - h_exact))
+        else:
+            return 100.0
   
     def get_R_for_eps(self, K, h_exact, y, seed):
         R = 1024
@@ -242,10 +235,10 @@ class BinomialExperiment():
 
 
 if __name__ == "__main__":
-    epsilons = [0.001,0.005,0.01]
+    epsilons = [0.001,0.01,0.1]
     for C in [10,1000]:
         for margin in [0.1,-0.1]:
-            s = BinomialExperiment(margin,C,estimations=10, Ms = 2**np.arange(4,9), shots = 2**np.arange(4,12),epsilons=epsilons)
-            #s.run()
-            s.load()
+            s = BinomialExperiment(margin,C,estimations=100, Ms = 2**np.arange(4,9), shots = 2**np.arange(4,12),epsilons=epsilons)
+            s.run()
+            #s.load()
             s.plot()
