@@ -128,6 +128,8 @@ class BinomialExperiment():
 
             p = np.polyfit(np.log(self.Ms), np.log(means), 1)
             exponents[i] = p[0]
+            plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
+            capsize=2, color=colors[i], ms=10, label = r'$\varepsilon = {{%s}}, \quad R \propto M^{{%.2f}}'%(eps, p[0]))
 
             plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
             capsize=2, color=colors[i], ms=10, label = r'$\varepsilon = {{%s}}, \quad R \propto M^{{%.2f}}$'%(eps, p[0]))
@@ -142,9 +144,13 @@ class BinomialExperiment():
         plt.legend()
         plt.xlabel(r'Data size $M$')
         plt.ylabel(r'Total number of shots $R$')
-        #plt.show()
+        plt.show()
         sep = 'separable' if self.margin > 0 else 'overlap'
+<<<<<<< HEAD
         plt.savefig(f'plots/binomial_experiment_{sep}_C_{self.C}.png',dpi=300,bbox_inches='tight')
+=======
+        #plt.savefig(f'plots/binomial_experiment_{sep}.png',dpi=300,bbox_inches='tight')
+>>>>>>> eb73f165764c218b9196c607db63edca8b19b7c3
 
         return exponents
             

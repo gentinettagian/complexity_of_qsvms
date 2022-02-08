@@ -10,11 +10,13 @@ from qiskit.utils import QuantumInstance
 from qiskit_machine_learning.algorithms.classifiers import VQC
 from qiskit.algorithms.optimizers import SPSA, GradientDescent
 
+from qiskit_machine_learning.utils.loss_functions import CrossEntropyLoss
+
 class ApproxQSVMTest():
     """
     Running QSVM Tests
     """
-    def __init__(self, d=2, Rshots = 1024, num_steps = 100, control_steps = 10, seed = 42, reps = 3, initial_weights = None) -> None:
+    def __init__(self, d=2, Rshots = 1024, num_steps = 100, control_steps = 10, seed = 42, reps = 3, initial_weights = None, batch_size = 5, tol = 1e-5) -> None:
         """
         q: number of qubits
         r: feature map repetitions
@@ -32,6 +34,7 @@ class ApproxQSVMTest():
         self.d = d
         self.seed = seed
         self._reps = reps
+        self.batch_size = batch_size
         
         # Seed for initial weights should be different from the generated data
         np.random.seed(2*seed)
@@ -40,11 +43,11 @@ class ApproxQSVMTest():
         self._weight = initial_weights
 
         # variational quantum circuit used to perform optimization
-        self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight)
+        self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight, batch_size=self.batch_size)
 
         # Statevector backend and model
         self._sv_instance = Aer.get_backend('statevector_simulator')
-        self._model_sv = VQC(self.d,reps=self._reps,quantum_instance=self._sv_instance,initial_point=self._weight)
+        self._model_sv = VQC(self.d,reps=self._reps,quantum_instance=self._sv_instance,initial_point=self._weight, batch_size=self.batch_size)
 
         self._x_test = None
         self._y_test = None
@@ -55,6 +58,9 @@ class ApproxQSVMTest():
         self._num_steps = num_steps
         self._control_steps = control_steps
         self._num_evals = 0
+        self._tol = tol
+
+        self._loss = CrossEntropyLoss()
 
         # Dictionary containing data accumulated during training
         self.history = {'accuracy' : [],
@@ -126,14 +132,29 @@ class ApproxQSVMTest():
 
         # Callback used to save data on the fly
         def callback(*args):
-            self.history["loss"].append(args[2])
             self.history["params"].append(args[1])
             self._weight = args[1]
             self._num_evals = args[0]
-            print(len(self.history['loss']),args[2])
+            n = len(self.history['loss'])
+            
+            h_pred = self._model.neural_network.forward(self._x_train, self._weight)
+            loss = np.mean(self._loss.evaluate(h_pred, self._y_train))
+            self.history["loss"].append(loss)
+            y_pred = [[0,1] if p[0] < p[1] else [1,0] for p in h_pred]
+            acc = np.sum(y_pred == self._y_train)/(2*len(y_pred))
+            self.history["accuracy"].append(acc)
+            print(f"{n}, Accuracy: {acc}, Loss: {loss}")
+
+            if n < 2:
+                return False
+            
+            if np.abs(self.history['loss'][-1] - self.history['loss'][-2]) < self._tol:
+                return True
+            else:
+                return False
         
-        optimizer = SPSA(maxiter=self._num_steps,callback=callback)
-        self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight,optimizer=optimizer)
+        optimizer = SPSA(maxiter=self._num_steps,termination_checker=callback)
+        self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight,optimizer=optimizer, batch_size=self.batch_size)
 
         
         if self._x_train is None:
@@ -236,12 +257,14 @@ def get_data_generated(qnn, M=100, margin=0.1, bias=0, shuffle=True, seed=41, re
 
 
 if __name__ == '__main__':
+    np.random.seed(42)
     seeds = np.random.randint(0,100000,100)
-    reps = 1
-    features = 8
-    margin = -0.1
+    reps = 3
+    features = 2
+    margin = 0.1
+    sep = 'separable' if margin > 0 else 'overlap'
     try:
-        df = pd.read_csv(f'features={features}/d={features*(reps+1)}/overlap_spsaapprox_tests.csv')
+        df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_conv_{sep}.csv')
     except:
         df = pd.DataFrame(columns=['Seed','Shots','Evaluations','CSteps','Epsilon'])
 
@@ -253,10 +276,12 @@ if __name__ == '__main__':
     for s in seeds:
         for R in Rs:
             print(f'Seed {s}, {R} shots.')
+            if np.any((df['Seed'] == s) & (df['Shots'] == R)):
+                continue
             test = ApproxQSVMTest(Rshots=R,d=features,num_steps=n,seed=s,reps=reps,control_steps=c)
             h, h_sv, n_evals, c_effective = test.run_experiment(margin=margin)
-            test.save(f'overlap_spsaseed_{s}_R_{R}_steps_{n_evals}_csteps_{c_effective}')
+            test.save(f'{sep}_spsa_sgd_conv_seed_{s}_R_{R}_steps_{n_evals}_csteps_{c_effective}')
             eps = np.max(np.abs(h-h_sv))
             df = df.append({'Seed':s,'Shots':R,'Evaluations':n_evals,'CSteps':c,'Epsilon':eps}, ignore_index=True)
-            df.to_csv(f'features={features}/d={features*(reps+1)}/overlap_spsaapprox_tests.csv',index=False)
+            df.to_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_conv_{sep}.csv',index=False)
    
