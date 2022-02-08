@@ -251,7 +251,7 @@ if __name__ == '__main__':
     n = 1000
 
     batches = [1,3,5,10,20]
-    tol = [1e-2, 1e-3, 1e-4, 1e-5]
+    tol = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
 
     for s in seeds:
@@ -264,7 +264,7 @@ if __name__ == '__main__':
             test.save(f'{sep}_hyper_seed_{s}_batch_{batch}_steps')
 
             for i, t in enumerate(tol):
-                df = df.append({'Seed':s,'Batch': batch,'Convergence': convergences[i],'Loss': losses[i],'Accuracy': accuracies[i]}, ignore_index=True)
+                df = df.append({'Seed':s,'Batch': batch,'Tol': tol, 'Convergence': convergences[i],'Loss': losses[i],'Accuracy': accuracies[i]}, ignore_index=True)
 
             df.to_csv(f'features={features}/d={features*(reps+1)}/hyper_{sep}.csv',index=False)
    

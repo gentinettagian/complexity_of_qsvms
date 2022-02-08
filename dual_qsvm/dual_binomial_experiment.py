@@ -124,11 +124,11 @@ class BinomialExperiment():
             upper = np.quantile(effective_R[:,:,i],upper_percentile,axis=-1)
             lower = np.quantile(effective_R[:,:,i],lower_percentile,axis=-1)
             errors = np.array([means - lower, upper - means])
-            plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
-            capsize=2, color=colors[i], ms=10, label = f'{eps}')
 
             p = np.polyfit(np.log(self.Ms), np.log(means), 1)
             exponents[i] = p[0]
+            plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
+            capsize=2, color=colors[i], ms=10, label = r'$\varepsilon = {{%s}}, \quad R \propto M^{{%.2f}}'%(eps, p[0]))
 
             M_fine = np.geomspace(np.min(self.Ms),np.max(self.Ms))
 
@@ -140,9 +140,9 @@ class BinomialExperiment():
         plt.legend()
         plt.xlabel(r'Data size $M$')
         plt.ylabel(r'Total number of shots $R$')
-        #plt.show()
+        plt.show()
         sep = 'separable' if self.margin > 0 else 'overlap'
-        plt.savefig(f'plots/binomial_experiment_{sep}.png',dpi=300,bbox_inches='tight')
+        #plt.savefig(f'plots/binomial_experiment_{sep}.png',dpi=300,bbox_inches='tight')
 
         return exponents
             

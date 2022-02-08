@@ -10,11 +10,13 @@ from qiskit.utils import QuantumInstance
 from qiskit_machine_learning.algorithms.classifiers import VQC
 from qiskit.algorithms.optimizers import SPSA, GradientDescent
 
+from qiskit_machine_learning.utils.loss_functions import CrossEntropyLoss
+
 class ApproxQSVMTest():
     """
     Running QSVM Tests
     """
-    def __init__(self, d=2, Rshots = 1024, num_steps = 100, control_steps = 10, seed = 42, reps = 3, initial_weights = None, batch_size = 5) -> None:
+    def __init__(self, d=2, Rshots = 1024, num_steps = 100, control_steps = 10, seed = 42, reps = 3, initial_weights = None, batch_size = 5, tol = 1e-5) -> None:
         """
         q: number of qubits
         r: feature map repetitions
@@ -56,6 +58,9 @@ class ApproxQSVMTest():
         self._num_steps = num_steps
         self._control_steps = control_steps
         self._num_evals = 0
+        self._tol = tol
+
+        self._loss = CrossEntropyLoss()
 
         # Dictionary containing data accumulated during training
         self.history = {'accuracy' : [],
@@ -127,21 +132,28 @@ class ApproxQSVMTest():
 
         # Callback used to save data on the fly
         def callback(*args):
-            self.history["loss"].append(args[2])
             self.history["params"].append(args[1])
             self._weight = args[1]
             self._num_evals = args[0]
             n = len(self.history['loss'])
-            if (n % 100 == 1) or (n < 100 and n % 10 == 1):
-                h_pred = self._model.neural_network.forward(self._x_train, self._weight)
-                y_pred = [[0,1] if p[0] < p[1] else [1,0] for p in h_pred]
-                acc = np.sum(y_pred == self._y_train)/(2*len(y_pred))
-                self.history["accuracy"].append(acc)
-                print(f"Accuracy: {acc}")
+            
+            h_pred = self._model.neural_network.forward(self._x_train, self._weight)
+            loss = np.mean(self._loss.evaluate(h_pred, self._y_train))
+            self.history["loss"].append(loss)
+            y_pred = [[0,1] if p[0] < p[1] else [1,0] for p in h_pred]
+            acc = np.sum(y_pred == self._y_train)/(2*len(y_pred))
+            self.history["accuracy"].append(acc)
+            print(f"{n}, Accuracy: {acc}, Loss: {loss}")
 
-            print(len(self.history['loss']),args[2])
+            if n < 2:
+                return False
+            
+            if np.abs(self.history['loss'][-1] - self.history['loss'][-2]) < self._tol:
+                return True
+            else:
+                return False
         
-        optimizer = SPSA(maxiter=self._num_steps,callback=callback)
+        optimizer = SPSA(maxiter=self._num_steps,termination_checker=callback)
         self._model = VQC(self.d,reps=self._reps,quantum_instance=self._backend,initial_point=self._weight,optimizer=optimizer, batch_size=self.batch_size)
 
         
@@ -249,10 +261,10 @@ if __name__ == '__main__':
     seeds = np.random.randint(0,100000,100)
     reps = 3
     features = 2
-    margin = -0.1
+    margin = 0.1
     sep = 'separable' if margin > 0 else 'overlap'
     try:
-        df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_{sep}.csv')
+        df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_conv_{sep}.csv')
     except:
         df = pd.DataFrame(columns=['Seed','Shots','Evaluations','CSteps','Epsilon'])
 
@@ -268,8 +280,8 @@ if __name__ == '__main__':
                 continue
             test = ApproxQSVMTest(Rshots=R,d=features,num_steps=n,seed=s,reps=reps,control_steps=c)
             h, h_sv, n_evals, c_effective = test.run_experiment(margin=margin)
-            test.save(f'{sep}_spsa_sgd_seed_{s}_R_{R}_steps_{n_evals}_csteps_{c_effective}')
+            test.save(f'{sep}_spsa_sgd_conv_seed_{s}_R_{R}_steps_{n_evals}_csteps_{c_effective}')
             eps = np.max(np.abs(h-h_sv))
             df = df.append({'Seed':s,'Shots':R,'Evaluations':n_evals,'CSteps':c,'Epsilon':eps}, ignore_index=True)
-            df.to_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_{sep}.csv',index=False)
+            df.to_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_conv_{sep}.csv',index=False)
    
