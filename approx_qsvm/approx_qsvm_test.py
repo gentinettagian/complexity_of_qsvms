@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
     reps = 1
     features = 8
-    margin = 0.1
+    margin = -0.1
     sep = 'separable' if margin > 0 else 'overlap'
     try:
         df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_conv_{sep}.csv')
