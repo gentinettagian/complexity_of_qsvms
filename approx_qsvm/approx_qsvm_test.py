@@ -247,9 +247,9 @@ def get_data_generated(qnn, M=100, margin=0.1, bias=0, shuffle=True, seed=41, re
 if __name__ == '__main__':
     np.random.seed(42)
     seeds = np.random.randint(0,100000,100)
-    reps = 3
-    features = 2
-    margin = -0.1
+    reps = 1
+    features = 8
+    margin = 0.1
     sep = 'separable' if margin > 0 else 'overlap'
     try:
         df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_{sep}.csv')
