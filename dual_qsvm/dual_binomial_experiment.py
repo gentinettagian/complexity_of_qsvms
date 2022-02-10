@@ -106,43 +106,51 @@ class BinomialExperiment():
 
 
             
-    def plot(self):
+    def plot(self, axis = None, xlabel=True, save=True, legend=True):
         """
         2) Plot M ~ R(eps0,M) * #Kernel entries for all eps0
         3) Determine exponents
         """
+        if axis is None:
+            fig, axis = plt.subplots(figsize=(10,7))
         # total kernel evaluations
         kernel_evaluations = 0.5 * self.Ms*(self.Ms - 1)
         effective_R = self.minimal_R * kernel_evaluations.reshape(-1,1,1)
 
         exponents = np.zeros(len(self.epsilons))
 
-        plt.figure(figsize=(10,7))
         for i, eps in enumerate(self.epsilons):
-            means = np.median(effective_R[:,:,i],axis=-1)
-            upper = np.quantile(effective_R[:,:,i],upper_percentile,axis=-1)
-            lower = np.quantile(effective_R[:,:,i],lower_percentile,axis=-1)
+            means = np.mean(effective_R[:,:self.estimations,i],axis=-1)
+            upper = np.quantile(effective_R[:,:self.estimations,i],upper_percentile,axis=-1)
+            lower = np.quantile(effective_R[:,:self.estimations,i],lower_percentile,axis=-1)
             errors = np.array([means - lower, upper - means])
 
             p = np.polyfit(np.log(self.Ms), np.log(means), 1)
             exponents[i] = p[0]
-            plt.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
-            capsize=2, color=colors[i], ms=10, label = r'$\varepsilon = {{%s}}, \quad R \propto M^{{%.2f}}$'%(eps, p[0]))
+            axis.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
+            capsize=2, color=colors[i], ms=10, label = r'$\varepsilon_0 = {{%s}}, \quad R \propto M^{{%.2f}}$'%(eps, p[0]))
 
             M_fine = np.geomspace(np.min(self.Ms),np.max(self.Ms))
 
-            plt.plot(M_fine, np.exp(p[1])*M_fine**p[0],'-.',color=colors[i])
+            axis.plot(M_fine, np.exp(p[1])*M_fine**p[0],'-.',color=colors[i])
 
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.grid()
-        plt.legend()
-        plt.xlabel(r'Data size $M$')
-        plt.ylabel(r'Total number of shots $R$')
+
+        
+        axis.set_xscale('log')
+        axis.set_yscale('log')
+        axis.grid()
+        if legend:
+            axis.legend()
+        if xlabel:
+            axis.set_xlabel(r'Data size $M$')
+        axis.set_ylabel(r'Total number of shots $R$')
+        axis.set_xticks(self.Ms, self.Ms)
+        axis.set_title(r'$\lambda = {{%s}}$'%(1/self.C))
         #plt.show()
         sep = 'separable' if self.margin > 0 else 'overlap'
-        plt.savefig(f'plots/binomial_experiment_{sep}_C_{self.C}.png',dpi=300,bbox_inches='tight')
-
+        if save:
+            plt.savefig(f'plots/binomial_experiment_{sep}_C_{self.C}.png',dpi=300,bbox_inches='tight')
+        
         return exponents
             
     
@@ -190,21 +198,7 @@ class BinomialExperiment():
          
             if np.all(R_for_eps > 0):
                 converged = True
-            
-            #if R > 1e10:
-            #    base = 10
-            
-            #plt.scatter(R,eps)
-            #plt.scatter(R,num_of_batches,marker='x')
-            #plt.pause(0.05)
-
-            
-            
-            
-        
-        
-        
-        #plt.show()
+   
             
         return R_for_eps
 
@@ -236,9 +230,16 @@ class BinomialExperiment():
 
 if __name__ == "__main__":
     epsilons = [0.001,0.01,0.1]
-    for C in [10,1000]:
-        for margin in [0.1,-0.1]:
-            s = BinomialExperiment(margin,C,estimations=100, Ms = 2**np.arange(4,13), shots = 2**np.arange(4,12),epsilons=epsilons)
-            s.run()
-            #s.load()
-            s.plot()
+
+    
+
+    for margin in [0.1,-0.1]:
+        fig, axs = plt.subplots(2,sharex=True,figsize=[12,12])
+        for i, C in enumerate([10,1000]):
+            s = BinomialExperiment(margin,C,estimations=10, Ms = 2**np.arange(4,11), shots = 2**np.arange(4,12),epsilons=epsilons)
+            #s.run()
+            s.load()
+            s.plot(axs[i], xlabel=i==1,save=False,legend=(i==1))
+        
+        sep = 'separable' if margin > 0 else 'overlap'
+        plt.savefig(f'plots/binomial_experiment_{sep}.png',dpi=300,bbox_inches='tight')
