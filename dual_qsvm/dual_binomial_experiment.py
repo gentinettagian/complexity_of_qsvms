@@ -238,7 +238,7 @@ if __name__ == "__main__":
     epsilons = [0.001,0.01,0.1]
     for C in [10,1000]:
         for margin in [0.1,-0.1]:
-            s = BinomialExperiment(margin,C,estimations=100, Ms = 2**np.arange(4,9), shots = 2**np.arange(4,12),epsilons=epsilons)
+            s = BinomialExperiment(margin,C,estimations=100, Ms = 2**np.arange(4,13), shots = 2**np.arange(4,12),epsilons=epsilons)
             s.run()
             #s.load()
             s.plot()
