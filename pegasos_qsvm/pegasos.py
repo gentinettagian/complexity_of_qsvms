@@ -1,5 +1,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+import sys
+import inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir) 
+
+from dual_qsvm.SVM import SVM
+class PegasosSVM(SVM):
+    """
+    Uses Pegasos algorithm to solve the SVM problem.
+    """
+    def __init__(self, kernel='precomputed', C=10, verbose=False, cut_near_zeros=False) -> None:
+        super().__init__(kernel, C, verbose, cut_near_zeros)
+
+    def fit(self, K, y, seed=41, N=1000):
+        y_preds, a, _, _ = pegasos(K, y, N, self.C)
+        self._alphas = a[-1]
+
+        if self._cut_near_zeros:
+            self._alphas[self._alphas < 1e-10] = 0
+        self._support = self._alphas != 0
+        self._dual_coef = self._alphas * y
+
+        if self._verbose:
+            print("Pegasos algorithm completed")
+            y_pred = np.sign(y_preds[-1])
+            accuracy = np.sum(y == y_pred) / len(y)
+            print("Training accuracy: ", accuracy)
+            print("Support vectors: ", np.sum(self._support))
+
+        return super().fit(K, y)
 
 
 
