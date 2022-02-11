@@ -17,7 +17,7 @@ class PegasosSVM(SVM):
         super().__init__(kernel, C, verbose, cut_near_zeros)
 
     def fit(self, K, y, seed=41, N=1000):
-        y_preds, a, _, _ = pegasos(K, y, N, self.C)
+        y_preds, a, _, _ = pegasos(K, y, N, self._C, seed, full_returns=True)
         self._alphas = a[-1]
 
         if self._cut_near_zeros:
@@ -32,7 +32,7 @@ class PegasosSVM(SVM):
             print("Training accuracy: ", accuracy)
             print("Support vectors: ", np.sum(self._support))
 
-        return super().fit(K, y)
+        return True
 
 
 
