@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 import numpy as np
 import quadprog as qp
 
@@ -40,7 +41,7 @@ class SVM():
 
         try:
             sol = qp.solve_qp(G, a, C, b)
-        except:
+        except ValueError:
             return False
         self._alphas = sol[0]
         if self._cut_near_zeros:
