@@ -41,6 +41,17 @@ class BinomialExperiment():
     """
     def __init__(self, margin, C, qubits=2, reps=4, seed = 42, Ms = 2**np.arange(4,10), shots = 2**np.arange(4,11), 
         epsilons = np.array([0.001,0.005,0.01,0.05,0.1]), estimations = 3) -> None:
+        """
+        margin.. Margin between classes
+        C.. regularization constant
+        qubits.. number of qubits
+        reps.. number of repetitions of the feature map
+        seed.. random seed
+        Ms.. array of number of data points
+        shots.. array of number of shots per evaluation
+        epsilons.. epsilons to analyse
+        estimations.. Number of experiments per data point
+        """
         self.feature_map = MediumFeatureMap(qubits, reps)
         self.margin = margin
         self.Ms = Ms
@@ -55,9 +66,7 @@ class BinomialExperiment():
  
     def run(self):
         """
-        1) For every M: 
-        - given exact Kernel draw binomial samples until |h-h_R| < eps
-
+        Run the experiment
         """
 
         
@@ -95,6 +104,9 @@ class BinomialExperiment():
         
 
     def load(self):
+        """
+        Load existing data from csv
+        """
         results = pd.read_csv(f'experiments/binomial_experiment_{self.margin}_C_{self.C}.csv')
 
         self.minimal_R = np.zeros((len(self.Ms), self.estimations, len(self.epsilons)))
@@ -134,8 +146,6 @@ class BinomialExperiment():
 
             axis.plot(M_fine, np.exp(p[1])*M_fine**p[0],'-.',color=colors[i])
 
-
-        
         axis.set_xscale('log')
         axis.set_yscale('log')
         axis.grid()
@@ -208,6 +218,9 @@ class BinomialExperiment():
 
 
     def load_data(self, M, seed = 42):
+        """
+        Load training data
+        """
         assert (M <= 2048) & (M % 2 == 0)
         y = np.array(pd.read_csv(f'data/2-qubits/{self.margin}_y_2048.csv')).reshape(-1)
         X = np.array(pd.read_csv(f'data/2-qubits/{self.margin}_X_2048.csv'))
@@ -229,10 +242,11 @@ class BinomialExperiment():
 
 
 if __name__ == "__main__":
+
+    # Epsilons to analyze
     epsilons = [0.001,0.01,0.1]
 
-    
-
+    # Both overlapping and separable data
     for margin in [0.1,-0.1]:
         fig, axs = plt.subplots(2,sharex=True,figsize=[12,12])
         for i, C in enumerate([10,1000]):

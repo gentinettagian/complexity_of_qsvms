@@ -247,18 +247,24 @@ def get_data_generated(qnn, M=100, margin=0.1, bias=0, shuffle=True, seed=41, re
 if __name__ == '__main__':
     np.random.seed(42)
     seeds = np.random.randint(0,100000,100)
+    # Repetitions of the variational form
     reps = 1
+    # Number of qubits
     features = 8
+    # Margin between classes
     margin = -0.1
     sep = 'separable' if margin > 0 else 'overlap'
+    # Load existitng data
     try:
         df = pd.read_csv(f'features={features}/d={features*(reps+1)}/spsa_sgd_{sep}.csv')
     except:
         df = pd.DataFrame(columns=['Seed','Shots','Evaluations','CSteps','Epsilon'])
 
-    print('updated files')
+    # Shots per expectation value
     Rs = 2**np.arange(1,14,2)
+    # Iteration steps (SPSA&SGD)
     n = 1000
+    # Control steps (GD)
     c = 30
 
     for s in seeds:
