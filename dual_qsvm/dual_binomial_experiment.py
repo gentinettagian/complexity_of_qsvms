@@ -253,7 +253,7 @@ if __name__ == "__main__":
             s = BinomialExperiment(margin,C,estimations=10, Ms = 2**np.arange(4,11), shots = 2**np.arange(4,12),epsilons=epsilons)
             #s.run()
             s.load()
-            s.plot(axs[i], xlabel=i==1,save=False,legend=(i==1))
+            s.plot(axs[i], xlabel=i==1,save=False,legend=True)
         
         sep = 'separable' if margin > 0 else 'overlap'
-        plt.savefig(f'plots/binomial_experiment_{sep}.png',dpi=300,bbox_inches='tight')
+        plt.savefig(f'plots/dual_M_{sep}.png',dpi=300,bbox_inches='tight')
