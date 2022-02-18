@@ -139,8 +139,8 @@ class BinomialExperiment():
 
             p = np.polyfit(np.log(self.Ms), np.log(means), 1)
             exponents[i] = p[0]
-            axis.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor='grey', elinewidth=1., ls='',
-            capsize=2, color=colors[i], ms=10, label = r'$\varepsilon_0 = {{%s}}, \quad R \propto M^{{%.2f}}$'%(eps, p[0]))
+            axis.errorbar(self.Ms, means, yerr=errors, marker='.', ecolor=colors[i], elinewidth=3., ls='',
+            capsize=6,capthick=2., color=colors[i], ms=20, label = r'$\varepsilon_0 = {{%s}}, \quad R \propto M^{{%.2f}}$'%(eps, p[0]))
 
             M_fine = np.geomspace(np.min(self.Ms),np.max(self.Ms))
 
