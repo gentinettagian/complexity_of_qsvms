@@ -2,10 +2,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from tqdm import tqdm
-import pickle
 from feature_maps import MediumFeatureMap
-from qiskit.utils import QuantumInstance, algorithm_globals
+from qiskit.utils import QuantumInstance
 from qiskit_machine_learning.kernels import QuantumKernel
 from qiskit import Aer
 from SVM import SVM

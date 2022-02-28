@@ -8,6 +8,7 @@ To reproduce the experiments, I highly suggest you create a new Python3 environm
 * pandas 1.3.4
 * quadprog 0.1.11
 * tqdm 4.62.3
+* pickleshare 0.7.5
 * scikit-learn 1.0.1
 * qiskit-aer 0.9.1
 * qiskit-ignis 0.6.0

@@ -8,7 +8,7 @@ import pickle
 from qiskit  import Aer
 from qiskit.utils import QuantumInstance
 from qiskit_machine_learning.algorithms.classifiers import VQC
-from qiskit.algorithms.optimizers import SPSA, GradientDescent
+from qiskit.algorithms.optimizers import SPSA
 
 from qiskit_machine_learning.utils.loss_functions import CrossEntropyLoss
 

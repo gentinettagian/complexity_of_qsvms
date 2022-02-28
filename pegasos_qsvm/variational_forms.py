@@ -3,7 +3,6 @@ from inspect import signature
 
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
-from qiskit.circuit.library import PauliTwoDesign, TwoLocal
 
 from model_base import Model
 

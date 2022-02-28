@@ -1,4 +1,3 @@
-import enum
 from qiskit import Aer
 from feature_maps import MediumFeatureMap
 from qiskit.utils import QuantumInstance, algorithm_globals
@@ -149,14 +148,14 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
     
     # Checking whether experiment has already been partially done and loading existing data
     try:
-        results = pd.read_csv(f'data/oneK_{margin}_data{N}.csv')
+        results = pd.read_csv(f'data/pegasos_{margin}_data{N}.csv')
     except:
         columns = ['seed','R','C','M']
         columns += [f'train acc. it. {n}' for n in range(N)]
         columns += [f'test acc. it. {n}' for n in range(N)]
         columns += [f'a error it. {n}' for n in range(N)]
         results = pd.DataFrame(columns=columns)
-        results.to_csv(f'data/oneK_{margin}_data{N}.csv',index=False)
+        results.to_csv(f'data/pegasos_{margin}_data{N}.csv',index=False)
 
     # Fix random seed to make reproducable
     np.random.seed(41)
@@ -206,7 +205,7 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
             # Saving results to csv
             results.loc[results.shape[0]] = [s, R, C, M] + accuracies.tolist() + accuracies_test.tolist() + errors_a.tolist()
-            results.to_csv(f'data/oneK_{margin}_data{N}.csv',index=False)
+            results.to_csv(f'data/pegasos_{margin}_data{N}.csv',index=False)
 
 def create_plots(filename,margin,N,legend=True,shots=None,upto=None):
     """
@@ -385,5 +384,5 @@ if __name__ == "__main__":
             #continue
             run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
         legend = margin < 0
-        create_plots(f'data/oneK_{margin}_data{N}.csv',margin,N,legend,shots)
+        create_plots(f'data/pegasos_{margin}_data{N}.csv',margin,N,legend,shots)
    
