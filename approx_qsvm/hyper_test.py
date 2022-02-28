@@ -17,7 +17,7 @@ class HyperParamsTest():
     """
     Running QSVM Tests
     """
-    def __init__(self, d=2, seed = 42, reps = 3, initial_weights = None, batch_size = 5, num_steps = 1000, tol = 1e-4) -> None:
+    def __init__(self, d=2, seed = 42, reps = 3, initial_weights = None, batch_size = 5, num_steps = 1000, tol = 1e-4, R = None) -> None:
         """
         q: number of qubits
         r: feature map repetitions
@@ -28,7 +28,10 @@ class HyperParamsTest():
         """
         
         # QASM-simulator used for the SPSA optimization
-        self._backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
+        if R == None:
+            self._backend = QuantumInstance(Aer.get_backend('statevector_simulator'))
+        else:
+            self._backend = QuantumInstance(Aer.get_backend('qasm_simulator'), shots=R)
         self.d = d
         self.seed = seed
         self._reps = reps
@@ -305,7 +308,40 @@ def d_test():
 
             df.to_csv(f'features={features}/d_{sep}.csv',index=False)
    
+def Conv_test(margin=0.1):
+    np.random.seed(42)
+    seeds = np.random.randint(0,100000,10)
+    reps = 3
+    features = 2
+    margin = margin
+    sep = 'separable' if margin > 0 else 'overlap'
+    try:
+        df = pd.read_csv(f'features={features}/d={features*(reps+1)}/Conv_{sep}.csv')
+    except:
+        df = pd.DataFrame(columns=['Seed','R','Tol','Convergence','Loss','Accuracy'])
+
+
+    n = 1000
+
+    M = 256
+    Shots = 2**np.arange(3,13)
+    tol = [1e-2, 1e-3, 1e-4]
+
+
+    for s in seeds:
+        for R in Shots:
+            print(f'Seed {s}, {R} shots.')
+            if np.any((df['Seed'] == s) & (df['R'] == R)):
+                continue
+            test = HyperParamsTest(d=features,num_steps=n,seed=s,reps=reps, tol=tol, R=R)
+            h, convergences, losses, accuracies = test.run_experiment(margin=margin, M=M)
+            test.save(f'{sep}_Conv_seed_{s}_R_{R}_steps')
+
+            for i, t in enumerate(tol):
+                df = df.append({'Seed':s,'R': R,'Tol': t, 'Convergence': convergences[i],'Loss': losses[i],'Accuracy': accuracies[i]}, ignore_index=True)
+
+            df.to_csv(f'features={features}/d={features*(reps+1)}/Conv_{sep}.csv',index=False)
 
 
 if __name__ == '__main__':
-    d_test()
+    Conv_test(0.1)

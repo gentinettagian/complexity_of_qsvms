@@ -186,10 +186,15 @@ def run_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
                 continue
             
             # Approximate Kernel
-            K_shots = shots_kernel.approximate_kernel(R,seed=s)
+            if R == np.inf:
+                K_shots = K
+            else:
+                K_shots = shots_kernel.approximate_kernel(R,seed=s)
 
             # Run pegasos with finite shots 'R'
-            y2, a2, _, _ = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
+            _, a2, _, _ = pegasos(K_shots,y,N,C,seed=s,full_returns=True)
+            y2 = np.sign(a2 * y @ K)
+            #print(y.shape, y2.shape)
             # Calculating the errors on the weights
             errors_a = np.linalg.norm(a - a2,axis = 1,ord = 1)
             # Calculating accuracy on test and training set
@@ -236,14 +241,17 @@ def create_plots(filename,margin,N,legend=True,shots=None,upto=None):
                 acc_lower = np.quantile(acc, lower_percentile, axis=0)
                 acc_upper = np.quantile(acc, upper_percentile, axis=0)
                 
-                axs_acc[j].plot(x, acc_mean[:upto], label=f'$R={int(R)}$',color=cols[i])
+                if R == np.inf:
+                    axs_acc[j].plot(x, acc_mean[:upto], label=f'Exact kernel',color=cols[i])
+                else:
+                    axs_acc[j].plot(x, acc_mean[:upto], label=f'$R={int(R)}$',color=cols[i])
                 #axs_acc[j].plot(x, acc_mean[:upto], label=f'$R={int(R)}$')
-                axs_acc[j].set_ylim(0.2,1)
+                axs_acc[j].set_ylim(0.4,1)
                 axs_acc[j].fill_between(x, acc_lower[:upto], acc_upper[:upto], alpha=0.3, edgecolor=None,color=cols[i])
                 #axs_acc[j].fill_between(x, acc_lower[:upto], acc_upper[:upto], alpha=0.3, edgecolor=None)
 
             tacc = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + N:4 + 2*N])
-            if tacc.shape[0] != 0:
+            if tacc.shape[0] != 0 and R != np.inf:
                 tacc_mean = np.mean(tacc,axis=0)
                 tacc_lower = np.quantile(tacc, lower_percentile, axis=0)
                 tacc_upper = np.quantile(tacc, upper_percentile, axis=0)
@@ -251,7 +259,7 @@ def create_plots(filename,margin,N,legend=True,shots=None,upto=None):
                 axs_tacc[j].fill_between(x, tacc_lower[:upto], tacc_upper[:upto], alpha=0.3, edgecolor=None)
 
             a = np.array(data.loc[(data['R'] == R) & (data['C'] == C)].iloc[:,4 + 2*N:])
-            if a.shape[0] != 0:
+            if a.shape[0] != 0 and R != np.inf:
                 a_mean = np.mean(a,axis=0)
                 a_lower = np.quantile(a, lower_percentile, axis=0)
                 a_upper = np.quantile(a, upper_percentile, axis=0)
@@ -363,7 +371,7 @@ def run_advanced_experiment(margin,C,N,shots,M=1000,M_test=100,n_tests=100):
 
 if __name__ == "__main__":
     shots = [1,2,8,16,32,64,128,256,512,1024]
-    shots = [1,2,8,32,128,1024]
+    shots = [1,8,32,128,1024,np.inf]
     N = 500
     M = 100
     M_test = 20
@@ -374,8 +382,8 @@ if __name__ == "__main__":
 
     for margin in margins:
         for C in Cs:
-            continue
-            #run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
+            #continue
+            run_experiment(margin,C,N,shots,M,M_test,n_tests=n_tests)
         legend = margin < 0
         create_plots(f'data/oneK_{margin}_data{N}.csv',margin,N,legend,shots)
    
