@@ -3,7 +3,7 @@ This repository contains all the code to reproduce the data and figures for the 
 
 Setup
 =====
-To reproduce the experiments, I highly suggest you create a new Python3 environment (e.g. with the `venv` tool). Python3.9 was used for the paper, though other versions of Python3 will probably also work fine. In your new environment install following packages (the exact version numbers are important!):
+To reproduce the experiments, I highly suggest you create a new Python3 environment (e.g. with the `venv` tool). Python3.9 was used for the paper, though other versions of Python3 will probably also work fine. In your new environment install the following packages (the exact version numbers are important!):
 * numpy 1.21.4
 * pandas 1.3.4
 * quadprog 0.1.11
@@ -19,7 +19,7 @@ In addition, the `qiskit-machine-learning` and `qiskit-terra` packages have to b
 * https://github.com/gentinettagian/qiskit-machine-learning.git
 * https://github.com/gentinettagian/qiskit-terra.git
 
-and added separately using `pip install -e`.
+and installed separately using `pip install -e`.
 
 If you wish to regenerate the plots, you will additionaly require matplotlib and latex to be installed.
 
