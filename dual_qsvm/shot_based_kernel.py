@@ -71,20 +71,4 @@ class BinomialKernel():
             return np.array(approximate_kernel, dtype = np.float64), len(weights)
         return np.array(approximate_kernel, dtype = np.float64)
 
-if __name__ == "__main__":
-    a = np.random.random((128,128))
-    a *= np.tri(*a.shape)
-    a += np.tril(a,-1).T
-    K = BinomialKernel(a)
-    exp = range(23)
-    eps = np.zeros(23)
-    for i in exp:
-        print(i)
-        a_prox = K.approximate_kernel(10**i)
-        print(a_prox)
-        eps[i] = np.linalg.norm(a - a_prox,ord=2)
-    import matplotlib.pyplot as plt
 
-    plt.plot(exp,eps)
-    plt.yscale('log')
-    plt.show()
