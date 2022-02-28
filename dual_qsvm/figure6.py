@@ -72,10 +72,10 @@ class BinomialExperiment():
         
         self.minimal_R = np.zeros((len(self.Ms), self.estimations, len(self.epsilons)))
         try:
-            results = pd.read_csv(f'experiments/binomial_experiment_{self.margin}_C_{self.C}.csv')
+            results = pd.read_csv(f'data/binomial_experiment_{self.margin}_C_{self.C}.csv')
         except:
             results = pd.DataFrame(columns=['M', 'seed'] + [eps for eps in self.epsilons])
-            results.to_csv(f'experiments/binomial_experiment_{self.margin}_C_{self.C}.csv',index=False)
+            results.to_csv(f'data/binomial_experiment_{self.margin}_C_{self.C}.csv',index=False)
 
         rng = np.random.default_rng(self.seed)
         seeds = rng.choice(10000, size=self.estimations, replace=False)
@@ -98,7 +98,7 @@ class BinomialExperiment():
                 self.minimal_R[i,l,:] = self.get_R_for_eps(K, h_exact, y, seeds[l])
                 results.loc[results.shape[0]] = [M, seeds[l]] + [R for R in self.minimal_R[i, l, :]]
             
-                results.to_csv(f'experiments/binomial_experiment_{self.margin}_C_{self.C}.csv',index=False)
+                results.to_csv(f'data/binomial_experiment_{self.margin}_C_{self.C}.csv',index=False)
 
         return
         
@@ -107,7 +107,7 @@ class BinomialExperiment():
         """
         Load existing data from csv
         """
-        results = pd.read_csv(f'experiments/binomial_experiment_{self.margin}_C_{self.C}.csv')
+        results = pd.read_csv(f'data/binomial_experiment_{self.margin}_C_{self.C}.csv')
 
         self.minimal_R = np.zeros((len(self.Ms), self.estimations, len(self.epsilons)))
         for i, M in enumerate(self.Ms):
