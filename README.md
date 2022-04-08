@@ -1,4 +1,4 @@
-This repository contains all the code to reproduce the data and figures for the paper _The complexity of quantum support vector machines_ by Gian Gentinetta, Arne Thomsen, David Sutter and Stefan Woerner ([WIP](WIP)).
+This repository contains all the code to reproduce the data and figures for the paper _The complexity of quantum support vector machines_ by Gian Gentinetta, Arne Thomsen, David Sutter and Stefan Woerner ([https://arxiv.org/abs/2203.00031](https://arxiv.org/abs/2203.00031)).
 
 
 Setup
